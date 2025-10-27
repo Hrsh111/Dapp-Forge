@@ -1,2 +1,2 @@
-# Dapp-Forge
-
+# my-dapp
+The project aims to develop a decentralized application (DApp) that leverages blockchain technology to provide a secure, transparent, and tamper-proof platform for [specific use case, e.g., managing digital assets, enabling trustless transactions, streamlining supply chain data, facilitating secure voting, etc.]. By eliminating centralized intermediaries, the DApp enhances user control, data integrity, and transparency while fostering trust in digital interactions.

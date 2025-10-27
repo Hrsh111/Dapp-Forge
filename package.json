@@ -1,0 +1,50 @@
+{
+  "name": "my-dapp",
+  "version": "1.0.0",
+  "description": "Blockchain Developer Bootcamp - Decentralized Application",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test",
+    "compile": "truffle compile",
+    "migrate": "truffle migrate",
+    "migrate:reset": "truffle migrate --reset",
+    "develop": "truffle develop",
+    "console": "truffle console",
+    "start": "cd client && npm start",
+    "client": "cd client && npm start",
+    "server": "truffle develop",
+    "build": "truffle compile",
+    "deploy:development": "truffle migrate --network development",
+    "deploy:ganache": "truffle migrate --network ganache"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "solidity",
+    "truffle",
+    "dapp",
+    "web3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "chai": "^4.3.7",
+    "chai-as-promised": "^7.1.1",
+    "truffle": "^5.11.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6",
+    "babel-polyfill": "^6.26.0",
+    "babel-register": "^6.26.0",
+    "dotenv": "^16.3.1",
+    "tree": "^0.1.3"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "smart-contract-tests",
+  "version": "1.0.0",
+  "description": "Smart contract tests for my DApp",
+  "scripts": {
+    "test": "mocha --require @babel/register --timeout 10000"
+  },
+  "dependencies": {
+    "chai-as-promised": "^8.0.1",
+    "web3": "^4.16.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "@babel/register": "^7.27.1",
+    "chai": "^4.3.8",
+    "mocha": "^10.2.0"
+  },
+  "babel": {
+    "presets": [
+      "@babel/preset-env"
+    ]
+  }
+}
