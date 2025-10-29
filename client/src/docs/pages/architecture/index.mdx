@@ -1,0 +1,52 @@
+# Architecture Overview
+
+Dapp-Forge follows a modern decentralized application architecture.
+
+## System Architecture
+```
+┌─────────────────────────────────────┐
+│        Frontend (React)             │
+│  - Components  - Redux  - Web3     │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│      Web3 Provider (MetaMask)       │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│   Smart Contracts (Ethereum)        │
+│  - Exchange.sol  - Token.sol        │
+└─────────────────────────────────────┘
+```
+
+## Technology Stack
+
+### Frontend
+- React 18
+- Redux Toolkit
+- Bootstrap 5
+- ApexCharts
+
+### Blockchain
+- Ethereum
+- Web3.js
+- Solidity Smart Contracts
+
+## Component Structure
+
+- **Navbar** - Navigation and wallet info
+- **Balance** - Token and ETH balances
+- **OrderBook** - Buy/sell orders
+- **PriceChart** - Trading charts
+- **Trades** - Transaction history
+
+## Data Flow
+
+1. User interacts with component
+2. Action dispatched to Redux
+3. Middleware processes (Thunk)
+4. Web3 calls smart contract
+5. State updated
+6. UI re-renders

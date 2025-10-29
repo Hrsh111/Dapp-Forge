@@ -1,0 +1,44 @@
+# State Management
+
+Redux setup and patterns in Dapp-Forge.
+
+## Store Structure
+```javascript
+{
+  web3: {
+    connection: Web3Instance,
+    account: "0x...",
+    networkId: 1
+  },
+  token: {
+    loaded: true,
+    contract: TokenContract
+  },
+  exchange: {
+    loaded: true,
+    contract: ExchangeContract,
+    orders: []
+  }
+}
+```
+
+## Actions
+```javascript
+// Load Web3
+dispatch(web3Loaded(web3))
+
+// Load Account
+dispatch(web3AccountLoaded(account))
+
+// Load Orders
+dispatch(allOrdersLoaded(orders))
+```
+
+## Selectors
+```javascript
+// Get account
+const account = useSelector(accountSelector)
+
+// Get orders
+const orders = useSelector(filledOrdersSelector)
+```

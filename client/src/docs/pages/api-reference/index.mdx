@@ -1,0 +1,57 @@
+# API Reference
+
+Complete function reference for Dapp-Forge.
+
+## Helper Functions
+
+### ether(n)
+Convert to Wei.
+```javascript
+ether(1) // "1000000000000000000"
+```
+
+### tokens(n)
+Convert to token units.
+```javascript
+tokens(100) // "100000000000000000000"
+```
+
+### formatBalance(balance)
+Format Wei to readable string.
+```javascript
+formatBalance("1500000000000000000") // "1.5000"
+```
+
+## Interactions
+
+### loadWeb3(dispatch)
+Initialize Web3 connection.
+
+### loadAccount(web3, dispatch)
+Load user's account.
+
+### loadToken(web3, networkId, dispatch)
+Load token contract.
+
+### loadExchange(web3, networkId, dispatch)
+Load exchange contract.
+
+### makeBuyOrder(exchange, token, web3, order, account, dispatch)
+Create a buy order.
+
+### fillOrder(exchange, order, account, dispatch)
+Fill an existing order.
+
+## Selectors
+
+### accountSelector(state)
+Get connected account.
+
+### filledOrdersSelector(state)
+Get filled orders with decorations.
+
+### orderBookSelector(state)
+Get buy and sell orders.
+
+### priceChartSelector(state)
+Get chart data.

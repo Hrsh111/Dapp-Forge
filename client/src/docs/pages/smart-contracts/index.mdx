@@ -1,0 +1,64 @@
+# Smart Contracts
+
+Dapp-Forge uses Ethereum smart contracts for decentralized trading.
+
+## Exchange Contract
+
+The core contract managing all trading operations.
+
+### Key Functions
+
+#### makeOrder()
+
+Create a new limit order.
+```solidity
+function makeOrder(
+    address _tokenGet,
+    uint256 _amountGet,
+    address _tokenGive,
+    uint256 _amountGive
+) public
+```
+
+**Usage:**
+```javascript
+await exchange.methods.makeOrder(
+  tokenAddress,
+  web3.utils.toWei('10', 'ether'),
+  ETHER_ADDRESS,
+  web3.utils.toWei('1', 'ether')
+).send({ from: account })
+```
+
+#### fillOrder()
+
+Execute an existing order.
+```solidity
+function fillOrder(uint256 _id) public
+```
+
+#### cancelOrder()
+
+Cancel your own order.
+```solidity
+function cancelOrder(uint256 _id) public
+```
+
+## Token Contract
+
+Standard ERC-20 token implementation.
+
+### Functions
+
+- `transfer()` - Transfer tokens
+- `approve()` - Approve spending
+- `balanceOf()` - Check balance
+- `allowance()` - Check allowance
+
+## Events
+
+- **Order** - New order created
+- **Trade** - Order filled
+- **Cancel** - Order cancelled
+- **Deposit** - Funds deposited
+- **Withdraw** - Funds withdrawn

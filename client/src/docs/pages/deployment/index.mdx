@@ -1,0 +1,47 @@
+# Deployment Guide
+
+Deploy Dapp-Forge to production.
+
+## Smart Contract Deployment
+```bash
+# Deploy to testnet
+truffle migrate --network sepolia
+
+# Deploy to mainnet
+truffle migrate --network mainnet
+```
+
+## Frontend Deployment
+
+### Vercel
+```bash
+npm i -g vercel
+cd src
+vercel
+```
+
+### Netlify
+```bash
+npm run build
+netlify deploy --prod --dir=build
+```
+
+### IPFS
+```bash
+ipfs add -r build/
+```
+
+## Configuration
+
+Create `.env.production`:
+```bash
+REACT_APP_NETWORK_ID=1
+REACT_APP_INFURA_KEY=your_key
+```
+
+## Security Checklist
+
+- [ ] Contracts audited
+- [ ] Private keys secured
+- [ ] HTTPS enabled
+- [ ] Error handling tested

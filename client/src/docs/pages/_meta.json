@@ -1,0 +1,36 @@
+{
+  "index": {
+    "title": "Introduction",
+    "theme": {
+      "breadcrumb": false,
+      "footer": true,
+      "sidebar": true,
+      "toc": true,
+      "pagination": true
+    }
+  },
+  "getting-started": {
+    "title": "Getting Started"
+  },
+  "architecture": {
+    "title": "Architecture"
+  },
+  "smart-contracts": {
+    "title": "Smart Contracts"
+  },
+  "frontend": {
+    "title": "Frontend Components"
+  },
+  "state-management": {
+    "title": "State Management"
+  },
+  "api-reference": {
+    "title": "API Reference"
+  },
+  "guides": {
+    "title": "Guides"
+  },
+  "deployment": {
+    "title": "Deployment"
+  }
+}

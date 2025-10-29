@@ -1,0 +1,266 @@
+# Dapp-Forge Documentation
+
+Welcome to **Dapp-Forge** - A fully decentralized exchange (DEX) platform built on Ethereum blockchain technology.
+
+## 🎯 What is Dapp-Forge?
+
+Dapp-Forge is a decentralized application (DApp) that enables **peer-to-peer token trading** without intermediaries. Built on Ethereum smart contracts, it provides a trustless, transparent, and secure platform for exchanging ERC-20 tokens with ETH.
+
+### Key Features
+
+- 🔒 **Trustless Trading** - No intermediaries, trade directly with other users
+- 🌐 **Transparent** - All transactions recorded on blockchain
+- 💰 **Non-Custodial** - You control your assets at all times
+- ⚡ **Real-time** - Live order books and instant trade execution
+- 📊 **Professional Charts** - ApexCharts integration for price visualization
+- 🔐 **Secure** - Auditable smart contracts with safety mechanisms
+
+## 🚀 Quick Start
+
+Get started in 5 minutes:
+```bash
+# 1. Clone the repository
+git clone https://github.com/Hrsh111/Dapp-Forge.git
+
+# 2. Navigate to client directory
+cd Dapp-Forge/client
+
+# 3. Install dependencies
+npm install
+
+# 4. Start development server
+npm start
+```
+
+The app will open at `http://localhost:3000`
+
+## 📖 Documentation Structure
+
+### For Beginners
+
+Start here if you're new to DApps or blockchain:
+
+1. **[Getting Started](/getting-started)** - Installation, setup, and first steps
+2. **[Architecture](/architecture)** - Understand how everything works
+3. **[Guides](/guides)** - Step-by-step tutorials
+
+### For Developers
+
+Deep technical documentation:
+
+4. **[Smart Contracts](/smart-contracts)** - Solidity contracts explained
+5. **[Frontend Components](/frontend)** - React components reference
+6. **[State Management](/state-management)** - Redux patterns and flow
+7. **[API Reference](/api-reference)** - Complete function reference
+
+### For Deployment
+
+Ready to go live:
+
+8. **[Deployment](/deployment)** - Deploy to testnet and mainnet
+
+## 🏗️ Architecture Overview
+```
+┌─────────────────────────────────────────────┐
+│           User Interface (React)            │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐      │
+│  │ Balance │ │OrderBook│ │  Chart  │      │
+│  └─────────┘ └─────────┘ └─────────┘      │
+└─────────────────┬───────────────────────────┘
+                  │
+         ┌────────▼────────┐
+         │  Redux Store    │
+         │  - web3         │
+         │  - token        │
+         │  - exchange     │
+         └────────┬────────┘
+                  │
+         ┌────────▼────────┐
+         │   Web3.js       │
+         │  (MetaMask)     │
+         └────────┬────────┘
+                  │
+         ┌────────▼────────┐
+         │ Smart Contracts │
+         │  - Exchange.sol │
+         │  - Token.sol    │
+         └─────────────────┘
+```
+
+## 💻 Technology Stack
+
+### Frontend
+- **React 18** - Modern UI framework
+- **Redux Toolkit** - State management
+- **Bootstrap 5** - Responsive styling
+- **ApexCharts** - Interactive charts
+- **Web3.js** - Ethereum integration
+
+### Blockchain
+- **Solidity** - Smart contract language
+- **Ethereum** - Blockchain platform
+- **Truffle** - Development framework
+- **Ganache** - Local blockchain
+
+### Tools
+- **MetaMask** - Wallet integration
+- **Infura/Alchemy** - Blockchain node access
+- **Etherscan** - Blockchain explorer
+
+## 🎓 Learning Path
+
+### Level 1: Beginner (Start Here)
+1. Install prerequisites
+2. Run the application
+3. Connect MetaMask
+4. Make your first trade
+5. Understand basic concepts
+
+**Estimated Time:** 1 hour
+
+### Level 2: Intermediate
+1. Understand smart contracts
+2. Explore frontend components
+3. Learn Redux state flow
+4. Modify styling
+5. Add simple features
+
+**Estimated Time:** 5-10 hours
+
+### Level 3: Advanced
+1. Write custom smart contracts
+2. Build new components
+3. Implement complex features
+4. Optimize gas usage
+5. Deploy to mainnet
+
+**Estimated Time:** 20+ hours
+
+## 🌟 Use Cases
+
+### What Can You Build?
+
+1. **Token Launchpad** - List new tokens for trading
+2. **NFT Marketplace** - Trade NFTs (with modifications)
+3. **DeFi Protocol** - Foundation for lending/borrowing
+4. **DAO Treasury** - Manage community funds
+5. **Educational Platform** - Learn blockchain development
+
+## 📊 Project Stats
+
+- **Lines of Code:** ~5,000+
+- **Smart Contracts:** 2 (Exchange, Token)
+- **React Components:** 10+
+- **Redux Actions:** 30+
+- **Test Coverage:** Coming soon
+
+## 🤝 Community
+
+- **GitHub:** [Hrsh111/Dapp-Forge](https://github.com/Hrsh111/Dapp-Forge)
+- **Issues:** Report bugs and request features
+- **Discussions:** Ask questions and share ideas
+- **Contributions:** Pull requests welcome!
+
+## ⚠️ Important Notes
+
+### Security Notice
+- ⚠️ **Not audited** - Do not use with real funds without audit
+- ⚠️ **Educational purpose** - Learn and experiment safely
+- ⚠️ **Test thoroughly** - Use testnets before mainnet
+- ⚠️ **Understand risks** - Smart contracts are immutable
+
+### Prerequisites Knowledge
+- Basic JavaScript/React
+- Understanding of blockchain concepts
+- Command line basics
+- Git fundamentals
+
+## 🎯 Next Steps
+
+Ready to dive in? Choose your path:
+
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginTop: '20px' }}>
+
+<div style={{ border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
+
+### 🚀 Get Started
+New to Dapp-Forge? Start here.
+
+→ [Installation Guide](/getting-started)
+
+</div>
+
+<div style={{ border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
+
+### 🏗️ Learn Architecture
+Understand the system design.
+
+→ [System Architecture](/architecture)
+
+</div>
+
+<div style={{ border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
+
+### 📜 Smart Contracts
+Deep dive into Solidity code.
+
+→ [Contract Documentation](/smart-contracts)
+
+</div>
+
+<div style={{ border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
+
+### 🎨 Frontend Guide
+Build the user interface.
+
+→ [Components Guide](/frontend)
+
+</div>
+
+</div>
+
+## 📝 Quick Examples
+
+### Example 1: Place a Buy Order
+```javascript
+// User wants to buy 10 tokens for 0.1 ETH each
+await exchange.methods.makeOrder(
+  tokenAddress,                      // Token to receive
+  web3.utils.toWei('10', 'ether'),   // Amount: 10 tokens
+  ETHER_ADDRESS,                     // Give ETH
+  web3.utils.toWei('1', 'ether')     // Total: 1 ETH
+).send({ from: account })
+```
+
+### Example 2: Fill an Order
+```javascript
+// Fill order #5 from the order book
+await exchange.methods.fillOrder(5)
+  .send({ from: account })
+```
+
+### Example 3: Check Balance
+```javascript
+// Check token balance on exchange
+const balance = await exchange.methods
+  .balanceOf(tokenAddress, account)
+  .call()
+
+console.log(`Balance: ${web3.utils.fromWei(balance)} tokens`)
+```
+
+## 🔗 Useful Links
+
+- [Ethereum Documentation](https://ethereum.org/developers)
+- [Solidity Documentation](https://docs.soliditylang.org)
+- [Web3.js Documentation](https://web3js.readthedocs.io)
+- [React Documentation](https://react.dev)
+- [Redux Documentation](https://redux.js.org)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/Hrsh111/Dapp-Forge/blob/main/LICENSE) file for details.
+
+---
+
+**Ready to build the future of finance? Let's get started! 🚀**

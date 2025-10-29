@@ -1,0 +1,671 @@
+# Getting Started
+
+Welcome! This guide will help you set up Dapp-Forge from scratch, even if you're new to blockchain development.
+
+## 📋 What You'll Learn
+
+By the end of this guide, you'll be able to:
+- ✅ Install all required software
+- ✅ Set up MetaMask wallet
+- ✅ Run Dapp-Forge locally
+- ✅ Connect to the blockchain
+- ✅ Make your first trade
+
+**Estimated Time:** 30-45 minutes
+
+---
+
+## 🎯 Prerequisites
+
+Before we begin, you'll need:
+
+### 1. Computer Requirements
+
+**Minimum:**
+- Operating System: Windows 10, macOS 10.14+, or Linux
+- RAM: 4GB minimum (8GB recommended)
+- Storage: 2GB free space
+- Internet connection
+
+### 2. Required Software
+
+We'll install these together:
+- **Node.js** (v16 or higher) - JavaScript runtime
+- **npm** (v7 or higher) - Package manager (comes with Node.js)
+- **Git** - Version control system
+- **MetaMask** - Browser extension wallet
+- **Code Editor** - VS Code recommended (optional but helpful)
+
+### 3. Knowledge Prerequisites
+
+**Required:**
+- Basic command line usage (we'll guide you)
+- Understanding of copy/paste 😊
+
+**Helpful but not required:**
+- JavaScript basics
+- React fundamentals
+- Blockchain concepts
+
+> 💡 **Don't worry!** We'll explain everything as we go. Even if you're a complete beginner, you can follow along.
+
+---
+
+## 📥 Step 1: Install Node.js and npm
+
+Node.js is required to run the application.
+
+### Check if Already Installed
+
+Open your terminal and run:
+```bash
+node --version
+npm --version
+```
+
+**If you see version numbers (like v18.17.0), skip to Step 2.**
+
+### Install Node.js
+
+#### For macOS:
+
+**Option 1: Using Homebrew (Recommended)**
+```bash
+# Install Homebrew if you don't have it
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js
+brew install node
+```
+
+**Option 2: Download Installer**
+1. Visit [nodejs.org](https://nodejs.org)
+2. Download the LTS version
+3. Run the installer
+4. Follow the prompts
+
+#### For Windows:
+
+1. Visit [nodejs.org](https://nodejs.org)
+2. Download the LTS version (e.g., 18.17.0 LTS)
+3. Run the `.msi` installer
+4. Keep all default settings
+5. Click "Next" through the wizard
+
+#### For Linux (Ubuntu/Debian):
+```bash
+# Update package manager
+sudo apt update
+
+# Install Node.js
+sudo apt install nodejs npm
+
+# Verify installation
+node --version
+npm --version
+```
+
+### Verify Installation
+
+Close and reopen your terminal, then run:
+```bash
+node --version  # Should show v16.0.0 or higher
+npm --version   # Should show v7.0.0 or higher
+```
+
+---
+
+## 📥 Step 2: Install Git
+
+Git is used to clone the repository.
+
+### Check if Already Installed
+```bash
+git --version
+```
+
+**If you see a version number, skip to Step 3.**
+
+### Install Git
+
+#### For macOS:
+```bash
+# Using Homebrew
+brew install git
+```
+
+#### For Windows:
+1. Download from [git-scm.com](https://git-scm.com/download/win)
+2. Run the installer
+3. Use default settings
+
+#### For Linux:
+```bash
+sudo apt install git
+```
+
+### Verify Installation
+```bash
+git --version  # Should show git version 2.x.x
+```
+
+---
+
+## 🦊 Step 3: Install MetaMask
+
+MetaMask is a cryptocurrency wallet that runs in your browser.
+
+### Install the Extension
+
+1. **Open your browser** (Chrome, Firefox, Brave, or Edge)
+
+2. **Visit MetaMask website:**
+   - Go to [metamask.io](https://metamask.io)
+   - Click "Download"
+   - Select your browser
+
+3. **Add to Browser:**
+   - Click "Add to Chrome" (or your browser)
+   - Click "Add Extension"
+   - Wait for installation to complete
+
+4. **Pin the Extension:**
+   - Click the puzzle icon (🧩) in browser toolbar
+   - Find MetaMask
+   - Click the pin icon 📌
+
+### Set Up Your Wallet
+
+**IMPORTANT: Write down your seed phrase! Keep it safe and NEVER share it!**
+
+1. **Open MetaMask:**
+   - Click the MetaMask fox icon
+   - Click "Get Started"
+
+2. **Create a New Wallet:**
+   - Click "Create a Wallet"
+   - Agree to terms
+   - Create a strong password
+   - Click "Create"
+
+3. **Secure Your Wallet:**
+   - Watch the security video (recommended)
+   - Click "Secure my wallet"
+   - **WRITE DOWN** your 12-word recovery phrase
+   - Store it somewhere safe (NOT on your computer)
+   - Confirm your phrase
+   - Click "Congratulations!"
+
+> ⚠️ **Critical:** Your seed phrase is the ONLY way to recover your wallet. Never share it with anyone!
+
+### Get Test ETH
+
+For testing, we'll use Sepolia testnet:
+
+1. **Switch to Sepolia Network:**
+   - Click MetaMask icon
+   - Click network dropdown (top center)
+   - Enable "Show test networks" in settings
+   - Select "Sepolia test network"
+
+2. **Copy Your Address:**
+   - Click on your account name
+   - Your address is copied!
+   - It looks like: `0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb`
+
+3. **Get Free Test ETH:**
+   - Visit a Sepolia faucet:
+     - [sepoliafaucet.com](https://sepoliafaucet.com)
+     - [faucet.sepolia.dev](https://faucet.sepolia.dev)
+   - Paste your address
+   - Request ETH
+   - Wait 1-2 minutes
+
+4. **Verify You Received ETH:**
+   - Check MetaMask
+   - You should see 0.5 or 1 SepoliaETH
+
+---
+
+## 📥 Step 4: Clone the Repository
+
+Now let's get the Dapp-Forge code.
+
+### Choose a Location
+
+First, decide where to save the project:
+```bash
+# Option 1: Home directory
+cd ~
+
+# Option 2: Documents folder
+cd ~/Documents
+
+# Option 3: Custom location
+cd /path/to/your/projects
+```
+
+### Clone the Repo
+```bash
+# Clone the repository
+git clone https://github.com/Hrsh111/Dapp-Forge.git
+
+# Navigate into the folder
+cd Dapp-Forge
+
+# Navigate to client folder
+cd client
+```
+
+### Verify Files
+
+Check that files were downloaded:
+```bash
+ls -la
+```
+
+You should see:
+- `package.json`
+- `public/`
+- `src/`
+- `README.md`
+
+---
+
+## 📦 Step 5: Install Dependencies
+
+Install all required packages:
+```bash
+npm install
+```
+
+**What's happening?**
+- npm reads `package.json`
+- Downloads all required libraries
+- Installs them in `node_modules/`
+
+**Expected output:**
+```
+added 1453 packages, and audited 1454 packages in 2m
+```
+
+> ⏱️ **This takes 2-5 minutes.** Time for a coffee break! ☕
+
+### Troubleshooting
+
+**Error: "npm: command not found"**
+- Solution: Install Node.js again (Step 1)
+- Make sure to restart your terminal
+
+**Error: "EACCES: permission denied"**
+```bash
+# On macOS/Linux, try:
+sudo npm install
+
+# Better solution: Fix npm permissions
+# Follow: https://docs.npmjs.com/resolving-eacces-permissions-errors
+```
+
+**Error: "network timeout"**
+- Check your internet connection
+- Try again: `npm install`
+- If still failing: `npm install --legacy-peer-deps`
+
+---
+
+## 🚀 Step 6: Start the Application
+
+Time to run Dapp-Forge!
+```bash
+npm start
+```
+
+**What happens:**
+1. React app compiles
+2. Development server starts
+3. Browser opens automatically
+4. App loads at `http://localhost:3000`
+
+**Expected output:**
+```
+Compiled successfully!
+
+You can now view client in the browser.
+
+  Local:            http://localhost:3000
+  On Your Network:  http://192.168.1.5:3000
+```
+
+> 🎉 **Success!** Your app should open in the browser!
+
+### First Look
+
+You should see:
+- **Navbar** at the top with "Dapp-Forge" logo
+- **"Connect Wallet" button** (if not connected)
+- **Order book, price chart, and trades** sections
+- **Balance section** showing ETH and token amounts
+
+---
+
+## 🔗 Step 7: Connect MetaMask
+
+Let's connect your wallet to the app.
+
+### Connect Your Wallet
+
+1. **Click "Connect Wallet"** button in navbar
+
+2. **MetaMask popup appears:**
+   - Shows your account
+   - Requests permission to connect
+   - Click "Next"
+   - Click "Connect"
+
+3. **Check Connection:**
+   - Your address appears in navbar
+   - Format: `0x742...0bEb` (shortened)
+   - Balance shows in Balance section
+
+### Switch Networks (if needed)
+
+If MetaMask shows wrong network:
+
+1. **Click MetaMask icon**
+2. **Click network dropdown**
+3. **Select "Sepolia test network"**
+4. **Refresh the page**
+
+---
+
+## 🎯 Step 8: Explore the Interface
+
+Now that you're connected, let's explore!
+
+### Dashboard Overview
+
+**1. Navbar (Top)**
+- Logo: Dapp-Forge
+- Account: Your connected address
+- Network: Current blockchain network
+
+**2. Balance Section (Left)**
+- **Wallet:** ETH and tokens in your MetaMask
+- **Exchange:** ETH and tokens deposited in the exchange
+- **Deposit/Withdraw buttons:** Move funds between wallet and exchange
+
+**3. New Order Section (Center-Left)**
+- **Buy Tab:** Create buy orders
+- **Sell Tab:** Create sell orders
+- **Amount field:** How many tokens
+- **Price field:** Price per token in ETH
+- **Buy/Sell Order button:** Submit order
+
+**4. Order Book (Center-Right)**
+- **Buy Orders (Green):** Users wanting to buy
+- **Sell Orders (Red):** Users wanting to sell
+- **Click an order:** Fill it instantly
+
+**5. Price Chart (Bottom-Left)**
+- **Candlestick chart:** Price over time
+- **Real-time updates:** As trades happen
+- **Interactive:** Zoom and pan
+
+**6. Trades Section (Bottom-Center)**
+- **Recent trades:** Latest executed orders
+- **Price changes:** Green (up) or Red (down)
+- **Timestamps:** When trades occurred
+
+**7. My Transactions (Bottom-Right)**
+- **Your open orders:** Orders you created
+- **Your filled orders:** Your completed trades
+- **Cancel button:** Cancel your open orders
+
+---
+
+## �� Step 9: Your First Trade
+
+Let's make your first trade! We'll do this step-by-step.
+
+### Scenario: Buy 10 Tokens
+
+**Goal:** Buy 10 DAPP tokens for 0.1 ETH each (total: 1 ETH)
+
+#### Step A: Check Your Balance
+
+1. Look at **Balance** section
+2. Confirm you have ETH in **Wallet**
+3. If no ETH, get test ETH (Step 3)
+
+#### Step B: Deposit ETH to Exchange
+
+Before trading, deposit ETH:
+
+1. **In Balance section**, find "ETH" row
+2. **Click "Deposit"** button
+3. **Enter amount:** `1` (1 ETH)
+4. **Click "Deposit"** button in popup
+5. **Confirm in MetaMask:**
+   - MetaMask popup appears
+   - Shows transaction details
+   - Click "Confirm"
+6. **Wait for confirmation:** (~15 seconds)
+7. **Balance updates:** ETH moves from Wallet to Exchange
+
+#### Step C: Create Buy Order
+
+1. **Click "Buy" tab** in New Order section
+
+2. **Enter details:**
+   - **Amount:** `10` (tokens you want)
+   - **Price:** `0.1` (ETH per token)
+   - **Total:** Automatically calculated (1 ETH)
+
+3. **Click "Buy Order"** button
+
+4. **Confirm in MetaMask:**
+   - Reviews transaction
+   - Shows gas fee
+   - Click "Confirm"
+
+5. **Wait for transaction:**
+   - Progress indicator shows
+   - Takes 15-30 seconds
+   - Order appears in Order Book
+
+#### Step D: Fill Someone's Sell Order (Alternative)
+
+Instead of creating an order, you can fill an existing one:
+
+1. **Look at Order Book**
+2. **Find a Sell Order** (red, on right side)
+3. **Click on the order** you want to fill
+4. **Confirm in MetaMask**
+5. **Trade executes immediately!**
+
+#### Step E: Verify Your Trade
+
+1. **Check Balance section:**
+   - Your ETH decreased
+   - Your tokens increased
+
+2. **Check Trades section:**
+   - Your trade appears at the top
+   - Shows amount, price, time
+
+3. **Check My Transactions:**
+   - Shows your order status
+   - "Filled" if completed
+   - "Open" if waiting
+
+---
+
+## 🎉 Congratulations!
+
+You've successfully:
+- ✅ Installed all required software
+- ✅ Set up MetaMask wallet
+- ✅ Cloned and ran Dapp-Forge
+- ✅ Connected to the blockchain
+- ✅ Made your first trade!
+
+---
+
+## 🐛 Common Issues & Solutions
+
+### Issue 1: "npm install" fails
+
+**Error:** `npm ERR! code EACCES`
+
+**Solution:**
+```bash
+# Try with sudo (macOS/Linux)
+sudo npm install
+
+# Or fix npm permissions permanently
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Issue 2: Port 3000 already in use
+
+**Error:** `Port 3000 is already in use`
+
+**Solution:**
+```bash
+# Option 1: Use different port
+PORT=3001 npm start
+
+# Option 2: Kill process on port 3000
+# macOS/Linux:
+lsof -ti:3000 | xargs kill -9
+
+# Windows:
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+### Issue 3: MetaMask not connecting
+
+**Symptoms:** Connect button doesn't work
+
+**Solutions:**
+1. **Refresh the page** (Ctrl+R or Cmd+R)
+2. **Check MetaMask is unlocked**
+3. **Switch to correct network** (Sepolia)
+4. **Clear browser cache**
+5. **Disable other wallet extensions**
+
+### Issue 4: Transaction fails
+
+**Error:** "Transaction failed" or "Out of gas"
+
+**Solutions:**
+1. **Check you have enough ETH** for gas fees
+2. **Increase gas limit** in MetaMask
+3. **Wait and try again** (network might be congested)
+4. **Check correct network** (Sepolia for testing)
+
+### Issue 5: Balance not updating
+
+**Symptoms:** Made trade but balance same
+
+**Solutions:**
+1. **Wait 30 seconds** for blockchain confirmation
+2. **Refresh the page**
+3. **Check transaction on Etherscan:**
+   - Copy transaction hash from MetaMask
+   - Visit [sepolia.etherscan.io](https://sepolia.etherscan.io)
+   - Paste hash and check status
+
+### Issue 6: "Cannot read property of undefined"
+
+**Error:** Console shows JavaScript errors
+
+**Solution:**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+npm start
+```
+
+---
+
+## 🎯 Next Steps
+
+Now that you're up and running:
+
+### Learn More
+- **[Architecture](/architecture)** - Understand how it works
+- **[Smart Contracts](/smart-contracts)** - Deep dive into contracts
+- **[Frontend](/frontend)** - Explore the UI components
+
+### Try These Exercises
+
+**Exercise 1: Explore Orders**
+- Create a buy order
+- Create a sell order  
+- Cancel an order
+- Fill someone else's order
+
+**Exercise 2: Deposit & Withdraw**
+- Deposit tokens to exchange
+- Withdraw tokens from exchange
+- Check balances update correctly
+
+**Exercise 3: Price Chart**
+- Make several trades
+- Watch price chart update
+- Identify price trends
+
+### Advanced Tutorials
+- **[Deploy Your Own Contracts](/guides#deploy-contracts)**
+- **[Customize the Frontend](/guides#customize-ui)**
+- **[Add New Features](/guides#add-features)**
+
+---
+
+## 📚 Additional Resources
+
+### Official Documentation
+- [Ethereum Docs](https://ethereum.org/developers)
+- [MetaMask Docs](https://docs.metamask.io)
+- [Web3.js Docs](https://web3js.readthedocs.io)
+
+### Learning Resources
+- [CryptoZombies](https://cryptozombies.io) - Learn Solidity
+- [Ethereum.org](https://ethereum.org/learn) - Blockchain basics
+- [freeCodeCamp](https://freecodecamp.org) - Web development
+
+### Community
+- [Ethereum Stack Exchange](https://ethereum.stackexchange.com)
+- [Reddit r/ethdev](https://reddit.com/r/ethdev)
+- [Discord Communities](https://ethereum.org/community)
+
+---
+
+## 💡 Tips for Success
+
+1. **Start with testnet** - Always test with Sepolia before mainnet
+2. **Keep seed phrase safe** - Write it down, store securely
+3. **Understand gas fees** - Know what you're paying for
+4. **Read error messages** - They usually tell you what's wrong
+5. **Ask for help** - Community is friendly and helpful
+6. **Take backups** - Save your work regularly
+7. **Learn gradually** - Don't rush, understand each step
+
+---
+
+## ❓ Need Help?
+
+- **📖 Check Documentation** - Most answers are here
+- **🐛 GitHub Issues** - Report bugs or ask questions
+- **💬 Discussions** - Community Q&A
+- **📧 Contact** - Reach out to maintainers
+
+---
+
+**Ready to dive deeper? Continue to [Architecture](/architecture) to understand how everything works! 🚀**
