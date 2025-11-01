@@ -1,0 +1,846 @@
+# Security Best Practices
+
+Comprehensive security guide for Dapp-Forge smart contracts and general DApp development.
+
+## 🔒 Security Overview
+
+Smart contract security is **critical** because:
+- Code is immutable after deployment
+- Funds can be permanently lost
+- Exploits are public and irreversible
+- No way to "patch" without migration
+
+### Security Mindset
+
+**Key Principles:**
+1. **Assume complexity introduces bugs**
+2. **Trust no one** (including users)
+3. **Fail safely** (prefer transaction revert over corruption)
+4. **Keep it simple** (simpler code = fewer bugs)
+5. **Test everything** (unit, integration, stress tests)
+
+## ⚠️ Critical Vulnerabilities
+
+### 1. Reentrancy Attacks
+
+**What is it?**
+When a contract calls an external contract that calls back into the original contract before the first call completes.
+
+**Vulnerable Code:**
+```solidity
+// ❌ DANGEROUS: External call before state update
+function withdrawEther(uint256 _amount) public {
+    require(balances[msg.sender] >= _amount);
+    
+    // External call BEFORE state change
+    payable(msg.sender).transfer(_amount);
+    
+    // State update AFTER external call
+    balances[msg.sender] -= _amount;  // Too late!
+}
+```
+
+**Attack Scenario:**
+```solidity
+// Attacker contract
+contract Attacker {
+    Exchange target;
+    
+    function attack() public {
+        target.withdrawEther(1 ether);
+    }
+    
+    // Fallback function called when receiving ETH
+    receive() external payable {
+        if (address(target).balance > 0) {
+            // Reenter before balance updated!
+            target.withdrawEther(1 ether);
+        }
+    }
+}
+```
+
+**Fixed Code (Checks-Effects-Interactions):**
+```solidity
+// ✅ SAFE: State update before external call
+function withdrawEther(uint256 _amount) public {
+    require(balances[msg.sender] >= _amount);
+    
+    // Update state FIRST
+    balances[msg.sender] -= _amount;
+    
+    // External call LAST
+    payable(msg.sender).transfer(_amount);
+}
+```
+
+**Dapp-Forge Implementation:**
+Our Exchange contract follows this pattern:
+```solidity
+function withdrawEther(uint256 _amount) public {
+    require(tokens[ETHER_ADDRESS][msg.sender] >= _amount);
+    
+    // ✅ Effects: Update state first
+    tokens[ETHER_ADDRESS][msg.sender] -= _amount;
+    
+    // ✅ Interactions: External call last
+    payable(msg.sender).transfer(_amount);
+    
+    emit Withdraw(ETHER_ADDRESS, msg.sender, _amount, 
+        tokens[ETHER_ADDRESS][msg.sender]);
+}
+```
+
+**Additional Protection:**
+```solidity
+// Using ReentrancyGuard (OpenZeppelin)
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract Exchange is ReentrancyGuard {
+    function withdrawEther(uint256 _amount) public nonReentrant {
+        // Function body
+    }
+}
+```
+
+### 2. Integer Overflow/Underflow
+
+**What is it?**
+When arithmetic operations exceed maximum or minimum values.
+
+**Vulnerable Code (Pre-Solidity 0.8):**
+```solidity
+// ❌ Old Solidity versions (< 0.8.0)
+uint256 balance = 0;
+balance = balance - 1;  // Underflows to 2^256 - 1!
+
+uint256 large = 2**256 - 1;
+large = large + 1;  // Overflows to 0!
+```
+
+**Fixed (Solidity 0.8.x):**
+```solidity
+// ✅ Solidity 0.8+ has automatic checks
+uint256 balance = 0;
+balance = balance - 1;  // Reverts with error!
+```
+
+**Dapp-Forge Protection:**
+```solidity
+// Using Solidity ^0.8.0
+pragma solidity ^0.8.0;
+
+// All arithmetic operations automatically checked
+tokens[_token][msg.sender] = tokens[_token][msg.sender] + _amount;
+// If overflow occurs, transaction reverts
+```
+
+**Manual SafeMath (if using older Solidity):**
+```solidity
+// Only needed for Solidity < 0.8.0
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract Token {
+    using SafeMath for uint256;
+    
+    function transfer(address _to, uint256 _value) public {
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);
+        balanceOf[_to] = balanceOf[_to].add(_value);
+    }
+}
+```
+
+### 3. Access Control Issues
+
+**What is it?**
+Functions that should be restricted are publicly accessible.
+
+**Vulnerable Code:**
+```solidity
+// ❌ DANGEROUS: Anyone can cancel any order!
+function cancelOrder(uint256 _id) public {
+    orderCancelled[_id] = true;
+}
+```
+
+**Fixed Code:**
+```solidity
+// ✅ SAFE: Only order creator can cancel
+function cancelOrder(uint256 _id) public {
+    _Order storage _order = orders[_id];
+    require(_order.user == msg.sender, "Not your order");
+    orderCancelled[_id] = true;
+}
+```
+
+**Dapp-Forge Implementation:**
+```solidity
+function cancelOrder(uint256 _id) public {
+    _Order storage _order = orders[_id];
+    
+    // ✅ Access control: Only order creator
+    require(address(_order.user) == msg.sender);
+    require(_order.id == _id);
+    
+    orderCancelled[_id] = true;
+    emit Cancel(/*...*/);
+}
+```
+
+**Owner-Only Functions:**
+```solidity
+address public owner;
+
+modifier onlyOwner() {
+    require(msg.sender == owner, "Only owner");
+    _;
+}
+
+constructor() {
+    owner = msg.sender;
+}
+
+function updateFeePercent(uint256 _newFee) public onlyOwner {
+    feePercent = _newFee;
+}
+```
+
+### 4. Front-Running Attacks
+
+**What is it?**
+Malicious actors see pending transactions and submit their own with higher gas to execute first.
+
+**Vulnerable Scenario:**
+```javascript
+// User sees good buy order at 0.1 ETH
+// Submits transaction to fill it
+
+// Attacker sees pending transaction
+// Submits same transaction with higher gas
+// Attacker's transaction processes first
+// User's transaction fails
+```
+
+**Mitigation Strategies:**
+
+**1. Commit-Reveal Scheme:**
+```solidity
+// Step 1: User commits hash
+mapping(address => bytes32) public commits;
+
+function commitOrder(bytes32 _hash) public {
+    commits[msg.sender] = _hash;
+}
+
+// Step 2: After block delay, reveal actual order
+function revealOrder(
+    address _tokenGet,
+    uint256 _amountGet,
+    address _tokenGive,
+    uint256 _amountGive,
+    bytes32 _salt
+) public {
+    bytes32 hash = keccak256(abi.encodePacked(
+        _tokenGet, _amountGet, _tokenGive, _amountGive, _salt
+    ));
+    require(commits[msg.sender] == hash, "Invalid reveal");
+    
+    // Create order
+    makeOrder(_tokenGet, _amountGet, _tokenGive, _amountGive);
+}
+```
+
+**2. Minimum Time Locks:**
+```solidity
+mapping(uint256 => uint256) public orderTimestamp;
+
+function fillOrder(uint256 _id) public {
+    require(
+        block.timestamp >= orderTimestamp[_id] + 10 seconds,
+        "Order too new"
+    );
+    // Fill order
+}
+```
+
+**3. Batch Auctions:**
+```solidity
+// Collect all orders for a time period
+// Execute all at once at same price
+// Eliminates time-based advantage
+```
+
+**Note:** Dapp-Forge currently doesn't implement front-running protection. This is a known limitation for educational purposes.
+
+### 5. Denial of Service (DoS)
+
+**What is it?**
+Attackers make contract unusable by causing all transactions to fail.
+
+**Vulnerable Code:**
+```solidity
+// ❌ DANGEROUS: External call in loop
+address[] public users;
+
+function distributeRewards() public {
+    for (uint i = 0; i < users.length; i++) {
+        // If any transfer fails, entire function fails
+        payable(users[i]).transfer(reward);
+    }
+}
+```
+
+**Attack Scenario:**
+```solidity
+// Attacker creates contract that rejects payments
+contract Attacker {
+    receive() external payable {
+        revert("I don't want your money!");
+    }
+}
+
+// Now distributeRewards() will always fail
+```
+
+**Fixed Code (Pull over Push):**
+```solidity
+// ✅ SAFE: Users withdraw their own rewards
+mapping(address => uint256) public rewards;
+
+function distributeRewards() public {
+    for (uint i = 0; i < users.length; i++) {
+        // Just update balance, don't transfer
+        rewards[users[i]] += calculateReward(users[i]);
+    }
+}
+
+function withdrawReward() public {
+    uint256 reward = rewards[msg.sender];
+    rewards[msg.sender] = 0;
+    payable(msg.sender).transfer(reward);
+}
+```
+
+**Dapp-Forge Approach:**
+- Users must explicitly withdraw funds
+- No automatic distributions
+- Each user's action is independent
+
+### 6. Timestamp Dependence
+
+**What is it?**
+Relying on `block.timestamp` for critical logic can be manipulated by miners.
+
+**Vulnerable Code:**
+```solidity
+// ❌ RISKY: Exact timestamp comparison
+function claimReward() public {
+    require(block.timestamp == unlockTime, "Not ready");
+    // Miner can manipulate by ~15 seconds
+}
+```
+
+**Better Code:**
+```solidity
+// ✅ SAFER: Range comparison
+function claimReward() public {
+    require(block.timestamp >= unlockTime, "Not ready");
+    // Miner manipulation less impactful
+}
+```
+
+**Dapp-Forge Usage:**
+```solidity
+// We only use timestamps for ordering, not critical logic
+_Order storage _order = orders[orderCount];
+_order.timestamp = block.timestamp;  // ✅ OK for ordering
+```
+
+**When to avoid timestamps:**
+- Random number generation
+- Critical state changes
+- Exact time requirements
+- High-value comparisons
+
+**Better alternatives:**
+- Block numbers (more predictable)
+- Oracle services (Chainlink VRF for randomness)
+- Time-weighted averages
+
+## 🛡️ Defense-in-Depth Strategy
+
+### Layer 1: Smart Contract Design
+
+**Principle of Least Privilege:**
+```solidity
+// Only give minimum necessary permissions
+function fillOrder(uint256 _id) public {
+    // Anyone can fill (needed for liquidity)
+}
+
+function cancelOrder(uint256 _id) public {
+    // Only creator can cancel (security)
+    require(orders[_id].user == msg.sender);
+}
+```
+
+**Fail-Safe Defaults:**
+```solidity
+// Default to restrictive, not permissive
+bool public paused = false;  // Default: not paused
+
+modifier whenNotPaused() {
+    require(!paused, "Contract paused");
+    _;
+}
+
+// Emergency pause
+function pause() public onlyOwner {
+    paused = true;
+}
+```
+
+**Circuit Breakers:**
+```solidity
+uint256 public maxOrderSize = 1000 ether;
+
+function makeOrder(/*...*/) public {
+    require(_amountGet <= maxOrderSize, "Order too large");
+    // Limits potential damage from exploits
+}
+```
+
+### Layer 2: Input Validation
+
+**Validate Everything:**
+```solidity
+function makeOrder(
+    address _tokenGet,
+    uint256 _amountGet,
+    address _tokenGive,
+    uint256 _amountGive
+) public {
+    // ✅ Validate addresses
+    require(_tokenGet != address(0), "Invalid token");
+    
+    // ✅ Validate amounts
+    require(_amountGet > 0, "Amount must be > 0");
+    require(_amountGive > 0, "Amount must be > 0");
+    
+    // ✅ Validate balance
+    require(balanceOf(_tokenGive, msg.sender) >= _amountGive, 
+        "Insufficient balance");
+    
+    // ✅ Validate different tokens
+    require(_tokenGet != _tokenGive, "Same token trade");
+    
+    // Create order
+}
+```
+
+**Range Checks:**
+```solidity
+function setFeePercent(uint256 _percent) public onlyOwner {
+    require(_percent <= 100, "Fee too high");
+    require(_percent >= 0, "Fee too low");
+    feePercent = _percent;
+}
+```
+
+### Layer 3: Error Handling
+
+**Use require() Correctly:**
+```solidity
+// ✅ GOOD: Descriptive error messages
+require(balance >= amount, "Insufficient balance");
+
+// ❌ BAD: No error message
+require(balance >= amount);
+
+// ✅ GOOD: Clear condition
+require(!orderFilled[_id], "Order already filled");
+```
+
+**Custom Errors (Solidity 0.8.4+):**
+```solidity
+// More gas efficient than strings
+error InsufficientBalance(uint256 available, uint256 required);
+error OrderAlreadyFilled(uint256 orderId);
+error Unauthorized(address caller);
+
+function withdraw(uint256 amount) public {
+    uint256 balance = balances[msg.sender];
+    if (balance < amount) {
+        revert InsufficientBalance(balance, amount);
+    }
+    // ... rest of code
+}
+```
+
+### Layer 4: Event Logging
+
+**Log All State Changes:**
+```solidity
+event Deposit(address token, address user, uint256 amount, uint256 balance);
+event Withdraw(address token, address user, uint256 amount, uint256 balance);
+event OrderCreated(uint256 id, address user, /*...*/);
+event OrderFilled(uint256 id, address filler, /*...*/);
+event OrderCancelled(uint256 id, /*...*/);
+
+// Emit in every state-changing function
+function depositEther() public payable {
+    tokens[ETHER_ADDRESS][msg.sender] += msg.value;
+    emit Deposit(ETHER_ADDRESS, msg.sender, msg.value, 
+        tokens[ETHER_ADDRESS][msg.sender]);  // ✅ Always emit
+}
+```
+
+**Why events matter:**
+- Off-chain monitoring
+- Audit trail
+- Frontend updates
+- Analytics and debugging
+
+## 🔐 Secure Coding Patterns
+
+### Pattern 1: Checks-Effects-Interactions
+
+```solidity
+function transfer(address _to, uint256 _amount) public {
+    // 1. CHECKS: Validate inputs
+    require(_to != address(0), "Invalid address");
+    require(balance[msg.sender] >= _amount, "Insufficient balance");
+    
+    // 2. EFFECTS: Update state
+    balance[msg.sender] -= _amount;
+    balance[_to] += _amount;
+    
+    // 3. INTERACTIONS: External calls
+    emit Transfer(msg.sender, _to, _amount);
+    // Any external calls go here
+}
+```
+
+### Pattern 2: Pull over Push
+
+```solidity
+// ❌ PUSH: Contract pushes funds to users
+function distributeRewards(address[] memory users) public {
+    for (uint i = 0; i < users.length; i++) {
+        payable(users[i]).transfer(rewards[users[i]]);
+        // If one fails, all fail!
+    }
+}
+
+// ✅ PULL: Users pull their own funds
+mapping(address => uint256) public pendingWithdrawals;
+
+function withdraw() public {
+    uint256 amount = pendingWithdrawals[msg.sender];
+    pendingWithdrawals[msg.sender] = 0;
+    payable(msg.sender).transfer(amount);
+    // Each user's withdrawal is independent
+}
+```
+
+### Pattern 3: Rate Limiting
+
+```solidity
+mapping(address => uint256) public lastActionTime;
+uint256 public constant MIN_ACTION_DELAY = 1 minutes;
+
+modifier rateLimit() {
+    require(
+        block.timestamp >= lastActionTime[msg.sender] + MIN_ACTION_DELAY,
+        "Action too frequent"
+    );
+    lastActionTime[msg.sender] = block.timestamp;
+    _;
+}
+
+function createOrder(/*...*/) public rateLimit {
+    // User can only create order once per minute
+}
+```
+
+### Pattern 4: State Machine
+
+```solidity
+enum State { Inactive, Active, Paused, Closed }
+State public contractState = State.Active;
+
+modifier inState(State _state) {
+    require(contractState == _state, "Invalid state");
+    _;
+}
+
+function fillOrder(uint256 _id) public inState(State.Active) {
+    // Only works when contract is Active
+}
+
+function pause() public onlyOwner inState(State.Active) {
+    contractState = State.Paused;
+}
+```
+
+## 🧪 Security Testing
+
+### Unit Tests for Security
+
+```javascript
+describe('Security: Access Control', () => {
+  it('prevents non-owner from canceling others orders', async () => {
+    // User1 creates order
+    await exchange.makeOrder(
+      token.address, tokens(1), ETHER_ADDRESS, ether(1),
+      { from: user1 }
+    )
+    
+    // User2 tries to cancel user1's order
+    await exchange.cancelOrder(1, { from: user2 })
+      .should.be.rejectedWith('revert')
+  })
+})
+
+describe('Security: Reentrancy', () => {
+  it('prevents reentrancy attacks', async () => {
+    // Deploy malicious contract
+    const attacker = await ReentrancyAttacker.new(exchange.address)
+    
+    // Fund attacker
+    await exchange.depositEther({ 
+      from: attacker.address, 
+      value: ether(1) 
+    })
+    
+    // Attempt attack
+    await attacker.attack()
+      .should.be.rejectedWith('revert')
+  })
+})
+
+describe('Security: Integer Overflow', () => {
+  it('prevents overflow in balance updates', async () => {
+    const maxUint = web3.utils.toBN(2).pow(web3.utils.toBN(256)).sub(web3.utils.toBN(1))
+    
+    // Try to deposit amount that would overflow
+    await exchange.depositEther({ value: maxUint })
+      .should.be.rejectedWith('revert')
+  })
+})
+```
+
+### Fuzzing Tests
+
+```javascript
+const { randomBytes } = require('crypto')
+
+describe('Fuzz Testing', () => {
+  it('handles random inputs safely', async () => {
+    // Generate 100 random test cases
+    for (let i = 0; i < 100; i++) {
+      const randomAmount = randomBytes(32)
+      const randomAddress = '0x' + randomBytes(20).toString('hex')
+      
+      try {
+        await exchange.makeOrder(
+          randomAddress,
+          randomAmount,
+          token.address,
+          tokens(1),
+          { from: user1 }
+        )
+      } catch (error) {
+        // Should fail gracefully, not crash
+        expect(error.message).to.include('revert')
+      }
+    }
+  })
+})
+```
+
+### Stress Testing
+
+```javascript
+describe('Stress Testing', () => {
+  it('handles large number of orders', async () => {
+    const orderCount = 1000
+    
+    for (let i = 0; i < orderCount; i++) {
+      await exchange.makeOrder(
+        token.address,
+        tokens(1),
+        ETHER_ADDRESS,
+        ether(0.1),
+        { from: user1 }
+      )
+    }
+    
+    const totalOrders = await exchange.orderCount()
+    expect(totalOrders.toNumber()).to.equal(orderCount)
+  })
+})
+```
+
+## 🔍 Security Audit Checklist
+
+### Pre-Deployment Checklist
+
+#### Code Quality
+- [ ] All functions have NatSpec comments
+- [ ] No compiler warnings
+- [ ] Uses latest stable Solidity version
+- [ ] Following style guide
+- [ ] Code is well-organized and readable
+
+#### Functionality
+- [ ] All features tested
+- [ ] Edge cases covered
+- [ ] Error cases handled
+- [ ] Events emitted correctly
+- [ ] State transitions validated
+
+#### Security
+- [ ] No reentrancy vulnerabilities
+- [ ] Integer overflow protected
+- [ ] Access control implemented
+- [ ] Input validation complete
+- [ ] No timestamp dependence
+- [ ] No DoS vulnerabilities
+- [ ] Front-running considered
+
+#### Testing
+- [ ] 100% unit test coverage
+- [ ] Integration tests pass
+- [ ] Stress tests pass
+- [ ] Fuzz testing done
+- [ ] Gas costs reasonable
+
+#### Documentation
+- [ ] README complete
+- [ ] API documentation done
+- [ ] Security considerations documented
+- [ ] Known issues listed
+- [ ] Upgrade path planned
+
+### Automated Security Tools
+
+**1. Slither (Static Analysis):**
+```bash
+pip3 install slither-analyzer
+slither contracts/Exchange.sol
+```
+
+**2. Mythril (Symbolic Execution):**
+```bash
+pip3 install mythril
+myth analyze contracts/Exchange.sol
+```
+
+**3. Echidna (Fuzzing):**
+```bash
+docker pull trailofbits/echidna
+docker run -v $(pwd):/src trailofbits/echidna echidna-test /src/contracts/Exchange.sol
+```
+
+**4. Manticore (Formal Verification):**
+```bash
+pip3 install manticore
+manticore contracts/Exchange.sol
+```
+
+## 🚨 Incident Response
+
+### Emergency Procedures
+
+**1. Pause Contract:**
+```solidity
+bool public paused = false;
+
+modifier whenNotPaused() {
+    require(!paused, "Paused");
+    _;
+}
+
+function pause() external onlyOwner {
+    paused = true;
+    emit Paused(msg.sender);
+}
+```
+
+**2. Upgrade Path:**
+```solidity
+// Proxy pattern for upgradeability
+contract ExchangeProxy {
+    address public implementation;
+    
+    function upgradeTo(address _newImplementation) external onlyOwner {
+        implementation = _newImplementation;
+    }
+    
+    fallback() external payable {
+        address impl = implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+}
+```
+
+**3. User Communication:**
+```solidity
+event EmergencyNotice(string message, uint256 timestamp);
+
+function notifyUsers(string memory _message) external onlyOwner {
+    emit EmergencyNotice(_message, block.timestamp);
+}
+```
+
+### Post-Incident Analysis
+
+**Steps:**
+1. **Identify** the vulnerability
+2. **Assess** the damage
+3. **Contain** the issue (pause if needed)
+4. **Fix** the vulnerability
+5. **Test** thoroughly
+6. **Deploy** fix
+7. **Document** the incident
+8. **Learn** and improve
+
+## 📚 Additional Resources
+
+### Security Auditing Services
+- [ConsenSys Diligence](https://consensys.net/diligence/)
+- [Trail of Bits](https://www.trailofbits.com/)
+- [OpenZeppelin](https://openzeppelin.com/security-audits/)
+- [Quantstamp](https://quantstamp.com/)
+
+### Learning Resources
+- [Smart Contract Security Best Practices](https://consensys.github.io/smart-contract-best-practices/)
+- [SWC Registry](https://swcregistry.io/) - Smart Contract Weakness Classification
+- [Ethernaut](https://ethernaut.openzeppelin.com/) - Security CTF
+- [Damn Vulnerable DeFi](https://www.damnvulnerabledefi.xyz/) - Security Challenges
+
+### Security Tools
+- [MythX](https://mythx.io/) - Security analysis platform
+- [Securify](https://securify.chainsecurity.com/) - Automated auditing
+- [Oyente](https://oyente.melonport.com/) - Security analyzer
+
+## 🔗 Related Documentation
+
+- [Exchange Contract](/smart-contracts/exchange)
+- [Token Contract](/smart-contracts/token)
+- [Testing Guide](/smart-contracts/testing)
+- [Gas Optimization](/smart-contracts/gas-optimization)
+
+---
+
+**Remember:** Security is an ongoing process, not a one-time task. Stay updated with latest vulnerabilities and best practices!
+
+**Questions?** Visit [GitHub Discussions](https://github.com/Hrsh111/Dapp-Forge/discussions) or [Security Advisories](https://github.com/Hrsh111/Dapp-Forge/security/advisories).

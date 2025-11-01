@@ -23,6 +23,36 @@ self.__BUILD_MANIFEST = {
       "static/chunks/webpack.js",
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
+    ],
+    "/deployment": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/deployment.js"
+    ],
+    "/guides": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/guides.js"
+    ],
+    "/smart-contracts": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/smart-contracts.js"
+    ],
+    "/smart-contracts/exchange": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/smart-contracts/exchange.js"
+    ],
+    "/smart-contracts/security": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/smart-contracts/security.js"
+    ],
+    "/smart-contracts/token": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/smart-contracts/token.js"
     ]
   },
   "ampFirstPages": []

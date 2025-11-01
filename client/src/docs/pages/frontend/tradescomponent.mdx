@@ -1,0 +1,651 @@
+# Trades Component
+
+Display list of recent filled orders across all users.
+
+**File:** `src/components/Trades.js`
+
+## Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { filledOrdersLoadedSelector, filledOrdersSelector } from '../store/selectors'
+
+class Trades extends Component {
+  render() {
+    return (
+      <div className="card bg-dark text-white">
+        <div className="card-header">Trades</div>
+        <div className="card-body">
+          <table className="table table-dark table-sm small">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>DAPP</th>
+                <th>DAPP/ETH</th>
+              </tr>
+            </thead>
+            <tbody>
+              {this.props.filledOrders.map(order => (
+                <tr key={order.id} className={`order-${order.tokenPriceClass}`}>
+                  <td className="text-muted">{order.formattedTimestamp}</td>
+                  <td>{order.tokenAmount}</td>
+                  <td className={`text-${order.tokenPriceClass}`}>
+                    {order.tokenPrice}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  return {
+    filledOrdersLoaded: filledOrdersLoadedSelector(state),
+    filledOrders: filledOrdersSelector(state)
+  }
+}
+
+export default connect(mapStateToProps)(Trades)
+```
+
+## Key Features
+
+### Order Decoration
+```javascript
+// In selectors
+const decorateFilledOrders = (orders) => {
+  let previousOrder = orders[0]
+  
+  return orders.map((order) => {
+    order = decorateOrder(order)
+    order = decorateFilledOrder(order, previousOrder)
+    previousOrder = order
+    return order
+  })
+}
+
+const decorateFilledOrder = (order, previousOrder) => {
+  return {
+    ...order,
+    tokenPriceClass: tokenPriceClass(order.tokenPrice, order.id, previousOrder)
+  }
+}
+
+const tokenPriceClass = (tokenPrice, orderId, previousOrder) => {
+  if (previousOrder.id === orderId) {
+    return GREEN
+  }
+  
+  if (previousOrder.tokenPrice <= tokenPrice) {
+    return GREEN // success
+  } else {
+    return RED // danger
+  }
+}
+```
+
+### Color Coding
+```css
+.order-success {
+  background-color: rgba(25, 135, 84, 0.05);
+}
+
+.order-danger {
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+.text-success {
+  color: #25CE8F !important;
+}
+
+.text-danger {
+  color: #F45353 !important;
+}
+```
+
+---
+
+# MyTransactions Component
+
+Shows user's personal orders (open and filled).
+
+**File:** `src/components/MyTransactions.js`
+
+## Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { Tabs, Tab } from 'react-bootstrap'
+import {
+  myFilledOrdersLoadedSelector,
+  myFilledOrdersSelector,
+  myOpenOrdersLoadedSelector,
+  myOpenOrdersSelector,
+  orderCancellingSelector
+} from '../store/selectors'
+import { cancelOrder } from '../store/interactions'
+
+class MyTransactions extends Component {
+  render() {
+    return (
+      <div className="card bg-dark text-white">
+        <div className="card-header">My Transactions</div>
+        <div className="card-body">
+          <Tabs defaultActiveKey="trades" className="bg-dark text-white">
+            <Tab eventKey="trades" title="Trades">
+              {this.renderFilledOrders()}
+            </Tab>
+            <Tab eventKey="orders" title="Orders">
+              {this.renderOpenOrders()}
+            </Tab>
+          </Tabs>
+        </div>
+      </div>
+    )
+  }
+
+  renderFilledOrders() {
+    const { myFilledOrders } = this.props
+    
+    return (
+      <table className="table table-dark table-sm small">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>DAPP</th>
+            <th>DAPP/ETH</th>
+          </tr>
+        </thead>
+        <tbody>
+          {myFilledOrders.map(order => (
+            <tr key={order.id}>
+              <td className="text-muted">{order.formattedTimestamp}</td>
+              <td className={`text-${order.orderTypeClass}`}>
+                {order.orderSign}{order.tokenAmount}
+              </td>
+              <td className={`text-${order.orderTypeClass}`}>
+                {order.tokenPrice}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  renderOpenOrders() {
+    const { myOpenOrders, dispatch, exchange, account } = this.props
+    
+    return (
+      <table className="table table-dark table-sm small">
+        <thead>
+          <tr>
+            <th>Amount</th>
+            <th>DAPP/ETH</th>
+            <th>Cancel</th>
+          </tr>
+        </thead>
+        <tbody>
+          {myOpenOrders.map(order => (
+            <tr key={order.id}>
+              <td className={`text-${order.orderTypeClass}`}>
+                {order.orderSign}{order.tokenAmount}
+              </td>
+              <td className={`text-${order.orderTypeClass}`}>
+                {order.tokenPrice}
+              </td>
+              <td>
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={(e) => {
+                    cancelOrder(dispatch, exchange, order, account)
+                  }}
+                >
+                  X
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  const myOpenOrdersLoaded = myOpenOrdersLoadedSelector(state)
+  const orderCancelling = orderCancellingSelector(state)
+
+  return {
+    myFilledOrders: myFilledOrdersSelector(state),
+    myFilledOrdersLoaded: myFilledOrdersLoadedSelector(state),
+    myOpenOrders: myOpenOrdersSelector(state),
+    myOpenOrdersLoaded,
+    showMyOpenOrders: myOpenOrdersLoaded && !orderCancelling,
+    exchange: exchangeSelector(state),
+    account: accountSelector(state)
+  }
+}
+
+export default connect(mapStateToProps)(MyTransactions)
+```
+
+## Key Features
+
+### Filter User Orders
+```javascript
+// Selectors
+export const myFilledOrdersSelector = createSelector(
+  accountSelector,
+  filledOrders,
+  (account, orders) => {
+    orders = orders.filter((o) => o.user === account || o.userFill === account)
+    orders = orders.sort((a, b) => b.timestamp - a.timestamp)
+    orders = decorateMyFilledOrders(orders, account)
+    return orders
+  }
+)
+
+export const myOpenOrdersSelector = createSelector(
+  accountSelector,
+  openOrders,
+  (account, orders) => {
+    orders = orders.filter((o) => o.user === account)
+    orders = orders.sort((a, b) => b.timestamp - a.timestamp)
+    orders = decorateMyOpenOrders(orders)
+    return orders
+  }
+)
+```
+
+### Order Sign
+```javascript
+const decorateMyFilledOrders = (orders, account) => {
+  return orders.map((order) => {
+    order = decorateOrder(order)
+    order = decorateMyFilledOrder(order, account)
+    return order
+  })
+}
+
+const decorateMyFilledOrder = (order, account) => {
+  const myOrder = order.user === account
+
+  let orderType
+  if (myOrder) {
+    orderType = order.tokenGive === ETHER_ADDRESS ? 'buy' : 'sell'
+  } else {
+    orderType = order.tokenGive === ETHER_ADDRESS ? 'sell' : 'buy'
+  }
+
+  return {
+    ...order,
+    orderType,
+    orderTypeClass: (orderType === 'buy' ? 'success' : 'danger'),
+    orderSign: (orderType === 'buy' ? '+' : '-')
+  }
+}
+```
+
+### Cancel Order
+```javascript
+// interactions.js
+export const cancelOrder = (dispatch, exchange, order, account) => {
+  exchange.methods.cancelOrder(order.id)
+    .send({ from: account })
+    .on('transactionHash', (hash) => {
+      dispatch(orderCancelling())
+    })
+    .on('error', (error) => {
+      console.error(error)
+      window.alert('There was an error!')
+    })
+}
+```
+
+---
+
+# NewOrder Component
+
+Form for creating new buy/sell orders.
+
+**File:** `src/components/NewOrder.js`
+
+## Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { Tabs, Tab } from 'react-bootstrap'
+import {
+  exchangeSelector,
+  tokenSelector,
+  accountSelector,
+  web3Selector,
+  buyOrderSelector,
+  sellOrderSelector
+} from '../store/selectors'
+import {
+  buyOrderAmountChanged,
+  buyOrderPriceChanged,
+  sellOrderAmountChanged,
+  sellOrderPriceChanged
+} from '../store/actions'
+import { makeBuyOrder, makeSellOrder } from '../store/interactions'
+
+class NewOrder extends Component {
+  render() {
+    return (
+      <div className="card bg-dark text-white">
+        <div className="card-header">New Order</div>
+        <div className="card-body">
+          <Tabs defaultActiveKey="buy" className="bg-dark text-white">
+            <Tab eventKey="buy" title="Buy" className="bg-dark">
+              {this.renderBuyForm()}
+            </Tab>
+            <Tab eventKey="sell" title="Sell" className="bg-dark">
+              {this.renderSellForm()}
+            </Tab>
+          </Tabs>
+        </div>
+      </div>
+    )
+  }
+
+  renderBuyForm() {
+    const {
+      dispatch,
+      buyOrder,
+      web3,
+      exchange,
+      token,
+      account,
+      showBuyTotal
+    } = this.props
+
+    return (
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        makeBuyOrder(dispatch, exchange, token, web3, buyOrder, account)
+      }}>
+        <div className="form-group small">
+          <label>Buy Amount (DAPP)</label>
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control form-control-sm bg-dark text-white"
+              placeholder="Buy Amount"
+              onChange={(e) => dispatch(buyOrderAmountChanged(e.target.value))}
+              required
+            />
+          </div>
+        </div>
+        <div className="form-group small">
+          <label>Buy Price</label>
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control form-control-sm bg-dark text-white"
+              placeholder="Buy Price"
+              onChange={(e) => dispatch(buyOrderPriceChanged(e.target.value))}
+              required
+            />
+          </div>
+        </div>
+        <button type="submit" className="btn btn-primary btn-sm btn-block">
+          Buy Order
+        </button>
+        {showBuyTotal && (
+          <small className="text-muted">
+            Total: {buyOrder.amount * buyOrder.price} ETH
+          </small>
+        )}
+      </form>
+    )
+  }
+
+  renderSellForm() {
+    const {
+      dispatch,
+      sellOrder,
+      web3,
+      exchange,
+      token,
+      account,
+      showSellTotal
+    } = this.props
+
+    return (
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        makeSellOrder(dispatch, exchange, token, web3, sellOrder, account)
+      }}>
+        <div className="form-group small">
+          <label>Sell Amount (DAPP)</label>
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control form-control-sm bg-dark text-white"
+              placeholder="Sell Amount"
+              onChange={(e) => dispatch(sellOrderAmountChanged(e.target.value))}
+              required
+            />
+          </div>
+        </div>
+        <div className="form-group small">
+          <label>Sell Price</label>
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control form-control-sm bg-dark text-white"
+              placeholder="Sell Price"
+              onChange={(e) => dispatch(sellOrderPriceChanged(e.target.value))}
+              required
+            />
+          </div>
+        </div>
+        <button type="submit" className="btn btn-primary btn-sm btn-block">
+          Sell Order
+        </button>
+        {showSellTotal && (
+          <small className="text-muted">
+            Total: {sellOrder.amount * sellOrder.price} ETH
+          </small>
+        )}
+      </form>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  const buyOrder = buyOrderSelector(state)
+  const sellOrder = sellOrderSelector(state)
+
+  return {
+    account: accountSelector(state),
+    exchange: exchangeSelector(state),
+    token: tokenSelector(state),
+    web3: web3Selector(state),
+    buyOrder,
+    sellOrder,
+    showBuyTotal: buyOrder.amount && buyOrder.price,
+    showSellTotal: sellOrder.amount && sellOrder.price
+  }
+}
+
+export default connect(mapStateToProps)(NewOrder)
+```
+
+## Key Features
+
+### Order Creation
+```javascript
+// interactions.js
+export const makeBuyOrder = (dispatch, exchange, token, web3, order, account) => {
+  const tokenGet = token.options.address
+  const amountGet = web3.utils.toWei(order.amount, 'ether')
+  const tokenGive = ETHER_ADDRESS
+  const amountGive = web3.utils.toWei((order.amount * order.price).toString(), 'ether')
+
+  exchange.methods.makeOrder(tokenGet, amountGet, tokenGive, amountGive)
+    .send({ from: account })
+    .on('transactionHash', (hash) => {
+      dispatch(buyOrderMaking())
+    })
+    .on('error', (error) => {
+      console.error(error)
+      window.alert('There was an error!')
+    })
+}
+
+export const makeSellOrder = (dispatch, exchange, token, web3, order, account) => {
+  const tokenGet = ETHER_ADDRESS
+  const amountGet = web3.utils.toWei((order.amount * order.price).toString(), 'ether')
+  const tokenGive = token.options.address
+  const amountGive = web3.utils.toWei(order.amount, 'ether')
+
+  exchange.methods.makeOrder(tokenGet, amountGet, tokenGive, amountGive)
+    .send({ from: account })
+    .on('transactionHash', (hash) => {
+      dispatch(sellOrderMaking())
+    })
+    .on('error', (error) => {
+      console.error(error)
+      window.alert('There was an error!')
+    })
+}
+```
+
+### Form Validation
+```javascript
+validateOrder(amount, price, balance) {
+  if (!amount || !price) {
+    return { valid: false, message: 'Please fill all fields' }
+  }
+  
+  if (parseFloat(amount) <= 0) {
+    return { valid: false, message: 'Amount must be greater than 0' }
+  }
+  
+  if (parseFloat(price) <= 0) {
+    return { valid: false, message: 'Price must be greater than 0' }
+  }
+  
+  const total = parseFloat(amount) * parseFloat(price)
+  if (total > parseFloat(balance)) {
+    return { valid: false, message: 'Insufficient balance' }
+  }
+  
+  return { valid: true }
+}
+
+handleSubmit = (event) => {
+  event.preventDefault()
+  
+  const validation = this.validateOrder(
+    this.props.buyOrder.amount,
+    this.props.buyOrder.price,
+    this.props.ethBalance
+  )
+  
+  if (!validation.valid) {
+    window.alert(validation.message)
+    return
+  }
+  
+  // Submit order
+  makeBuyOrder(...)
+}
+```
+
+### Quick Price Selection
+```javascript
+renderPricePresets() {
+  const presets = [0.05, 0.10, 0.15, 0.20]
+  
+  return (
+    <div className="price-presets">
+      {presets.map(price => (
+        <button
+          key={price}
+          type="button"
+          className="btn btn-sm btn-outline-secondary me-1"
+          onClick={() => this.props.dispatch(buyOrderPriceChanged(price.toString()))}
+        >
+          {price}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+### Amount Percentage Buttons
+```javascript
+renderAmountPercentages() {
+  const percentages = [25, 50, 75, 100]
+  
+  return (
+    <div className="amount-percentages">
+      {percentages.map(pct => (
+        <button
+          key={pct}
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => this.setAmountByPercentage(pct)}
+        >
+          {pct}%
+        </button>
+      ))}
+    </div>
+  )
+}
+
+setAmountByPercentage(percentage) {
+  const { tokenBalance } = this.props
+  const amount = (tokenBalance * percentage) / 100
+  this.props.dispatch(sellOrderAmountChanged(amount.toString()))
+}
+```
+
+## Redux Actions
+
+```javascript
+// actions.js
+export function buyOrderAmountChanged(amount) {
+  return {
+    type: 'BUY_ORDER_AMOUNT_CHANGED',
+    amount
+  }
+}
+
+export function buyOrderPriceChanged(price) {
+  return {
+    type: 'BUY_ORDER_PRICE_CHANGED',
+    price
+  }
+}
+
+// Similar for sell orders...
+```
+
+## Redux Selectors
+
+```javascript
+// selectors.js
+export const buyOrderSelector = createSelector(
+  state => state.exchange.buyOrder,
+  order => order
+)
+
+export const sellOrderSelector = createSelector(
+  state => state.exchange.sellOrder,
+  order => order
+)
+```

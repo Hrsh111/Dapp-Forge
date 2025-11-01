@@ -1,0 +1,938 @@
+# Exchange Contract Deep Dive
+
+Complete technical documentation for the Exchange.sol smart contract - the core of Dapp-Forge's decentralized trading system.
+
+## 📋 Contract Overview
+
+The Exchange contract is a decentralized exchange (DEX) that allows users to trade ERC-20 tokens and ETH in a trustless manner using an on-chain order book model.
+
+### Contract Details
+- **Language**: Solidity ^0.8.0
+- **License**: MIT
+- **Model**: Order Book DEX
+- **Settlement**: Instant on-chain
+
+## 🏗️ Contract Structure
+
+### State Variables
+
+```solidity
+// Fee account and percentage
+address public feeAccount;        // Account that receives trading fees
+uint256 public feePercent;        // Fee percentage (e.g., 10 = 10%)
+
+// Order tracking
+uint256 public orderCount;        // Total number of orders created
+mapping(uint256 => _Order) public orders;           // Order ID => Order
+mapping(uint256 => bool) public orderCancelled;     // Order ID => Cancelled status
+mapping(uint256 => bool) public orderFilled;        // Order ID => Filled status
+
+// Balance tracking
+mapping(address => mapping(address => uint256)) public tokens;
+// tokens[tokenAddress][userAddress] = balance
+```
+
+### Order Structure
+
+```solidity
+struct _Order {
+    uint256 id;              // Unique order identifier
+    address user;            // Address of order creator
+    address tokenGet;        // Token user wants to receive
+    uint256 amountGet;       // Amount user wants to receive
+    address tokenGive;       // Token user is giving
+    uint256 amountGive;      // Amount user is giving
+    uint256 timestamp;       // When order was created
+}
+```
+
+**Understanding the Order Structure:**
+- For a **buy order**: tokenGet = DAPP, tokenGive = ETH
+- For a **sell order**: tokenGet = ETH, tokenGive = DAPP
+- Price = amountGive / amountGet
+
+## 🔧 Core Functions
+
+### Constructor
+
+```solidity
+constructor(address _feeAccount, uint256 _feePercent) {
+    feeAccount = _feeAccount;
+    feePercent = _feePercent;
+}
+```
+
+**Parameters:**
+- `_feeAccount`: Address that will receive trading fees
+- `_feePercent`: Fee percentage (10 = 10%)
+
+**Example Deployment:**
+```javascript
+const exchange = await Exchange.new(
+  accounts[0],  // Fee account
+  10           // 10% fee
+)
+```
+
+### Deposit Functions
+
+#### depositEther()
+
+```solidity
+function depositEther() public payable {
+    tokens[ETHER_ADDRESS][msg.sender] = 
+        tokens[ETHER_ADDRESS][msg.sender] + msg.value;
+    emit Deposit(ETHER_ADDRESS, msg.sender, msg.value, 
+        tokens[ETHER_ADDRESS][msg.sender]);
+}
+```
+
+**How it works:**
+1. User sends ETH with transaction (msg.value)
+2. Contract updates user's ETH balance
+3. Emits Deposit event
+4. No approval needed (ETH is native)
+
+**Usage:**
+```javascript
+// Deposit 1 ETH
+await exchange.methods.depositEther().send({
+  from: account,
+  value: web3.utils.toWei('1', 'ether')
+})
+```
+
+**Gas Cost:** ~50,000 gas
+
+#### depositToken()
+
+```solidity
+function depositToken(address _token, uint256 _amount) public {
+    require(_token != ETHER_ADDRESS);
+    require(Token(_token).transferFrom(msg.sender, address(this), _amount));
+    tokens[_token][msg.sender] = tokens[_token][msg.sender] + _amount;
+    emit Deposit(_token, msg.sender, _amount, tokens[_token][msg.sender]);
+}
+```
+
+**How it works:**
+1. Requires prior approval of tokens
+2. Transfers tokens from user to exchange
+3. Updates user's token balance
+4. Emits Deposit event
+
+**Usage:**
+```javascript
+// Step 1: Approve tokens
+await token.methods.approve(
+  exchangeAddress,
+  web3.utils.toWei('100', 'ether')
+).send({ from: account })
+
+// Step 2: Deposit tokens
+await exchange.methods.depositToken(
+  tokenAddress,
+  web3.utils.toWei('100', 'ether')
+).send({ from: account })
+```
+
+**Requirements:**
+- Token must not be ETHER_ADDRESS
+- User must have approved exchange
+- User must have sufficient token balance
+
+**Gas Cost:** ~65,000 gas
+
+### Withdrawal Functions
+
+#### withdrawEther()
+
+```solidity
+function withdrawEther(uint256 _amount) public {
+    require(tokens[ETHER_ADDRESS][msg.sender] >= _amount);
+    tokens[ETHER_ADDRESS][msg.sender] = 
+        tokens[ETHER_ADDRESS][msg.sender] - _amount;
+    payable(msg.sender).transfer(_amount);
+    emit Withdraw(ETHER_ADDRESS, msg.sender, _amount, 
+        tokens[ETHER_ADDRESS][msg.sender]);
+}
+```
+
+**How it works:**
+1. Checks user has sufficient balance
+2. Updates user's balance (before transfer for safety)
+3. Transfers ETH to user
+4. Emits Withdraw event
+
+**Usage:**
+```javascript
+// Withdraw 0.5 ETH
+await exchange.methods.withdrawEther(
+  web3.utils.toWei('0.5', 'ether')
+).send({ from: account })
+```
+
+**Security Note:** Uses checks-effects-interactions pattern to prevent reentrancy.
+
+#### withdrawToken()
+
+```solidity
+function withdrawToken(address _token, uint256 _amount) public {
+    require(_token != ETHER_ADDRESS);
+    require(tokens[_token][msg.sender] >= _amount);
+    tokens[_token][msg.sender] = tokens[_token][msg.sender] - _amount;
+    require(Token(_token).transfer(msg.sender, _amount));
+    emit Withdraw(_token, msg.sender, _amount, tokens[_token][msg.sender]);
+}
+```
+
+**How it works:**
+1. Validates token address
+2. Checks sufficient balance
+3. Updates balance
+4. Transfers tokens to user
+5. Emits Withdraw event
+
+**Usage:**
+```javascript
+// Withdraw 50 tokens
+await exchange.methods.withdrawToken(
+  tokenAddress,
+  web3.utils.toWei('50', 'ether')
+).send({ from: account })
+```
+
+### Order Management Functions
+
+#### makeOrder()
+
+```solidity
+function makeOrder(
+    address _tokenGet, 
+    uint256 _amountGet, 
+    address _tokenGive, 
+    uint256 _amountGive
+) public {
+    require(balanceOf(_tokenGive, msg.sender) >= _amountGive);
+    
+    orderCount = orderCount + 1;
+    orders[orderCount] = _Order(
+        orderCount,
+        msg.sender,
+        _tokenGet,
+        _amountGet,
+        _tokenGive,
+        _amountGive,
+        block.timestamp
+    );
+    
+    emit Order(orderCount, msg.sender, _tokenGet, _amountGet, 
+        _tokenGive, _amountGive, block.timestamp);
+}
+```
+
+**How it works:**
+1. Validates user has sufficient balance
+2. Increments order counter
+3. Creates new order in storage
+4. Emits Order event
+
+**Parameters Explained:**
+- `_tokenGet`: What you want to receive
+- `_amountGet`: How much you want to receive
+- `_tokenGive`: What you're offering
+- `_amountGive`: How much you're offering
+
+**Example: Buy Order**
+```javascript
+// Buy 100 DAPP for 10 ETH
+// Price: 0.1 ETH per DAPP
+await exchange.methods.makeOrder(
+  dappToken.address,                    // tokenGet: DAPP
+  web3.utils.toWei('100', 'ether'),     // amountGet: 100 DAPP
+  ETHER_ADDRESS,                        // tokenGive: ETH
+  web3.utils.toWei('10', 'ether')       // amountGive: 10 ETH
+).send({ from: buyer })
+```
+
+**Example: Sell Order**
+```javascript
+// Sell 100 DAPP for 10 ETH
+// Price: 0.1 ETH per DAPP
+await exchange.methods.makeOrder(
+  ETHER_ADDRESS,                        // tokenGet: ETH
+  web3.utils.toWei('10', 'ether'),      // amountGet: 10 ETH
+  dappToken.address,                    // tokenGive: DAPP
+  web3.utils.toWei('100', 'ether')      // amountGive: 100 DAPP
+).send({ from: seller })
+```
+
+**Requirements:**
+- Must have deposited sufficient balance
+- All amounts must be > 0
+
+**Gas Cost:** ~100,000 gas
+
+#### fillOrder()
+
+```solidity
+function fillOrder(uint256 _id) public {
+    require(_id > 0 && _id <= orderCount);
+    require(!orderFilled[_id]);
+    require(!orderCancelled[_id]);
+    
+    _Order storage _order = orders[_id];
+    _trade(_order.id, _order.user, _order.tokenGet, _order.amountGet, 
+        _order.tokenGive, _order.amountGive);
+    orderFilled[_order.id] = true;
+}
+```
+
+**How it works:**
+1. Validates order ID exists
+2. Checks order not already filled
+3. Checks order not cancelled
+4. Executes trade via _trade()
+5. Marks order as filled
+
+**Usage:**
+```javascript
+// Fill order #5
+await exchange.methods.fillOrder(5).send({ from: account })
+```
+
+**What Happens During Fill:**
+1. Taker gives tokenGet to maker
+2. Maker gives tokenGive to taker
+3. Fee deducted from tokenGet amount
+4. Fee sent to fee account
+5. Trade event emitted
+
+**Requirements:**
+- Order must exist
+- Order must not be filled
+- Order must not be cancelled
+- Filler must have sufficient balance
+
+**Gas Cost:** ~150,000 gas (most expensive operation)
+
+#### cancelOrder()
+
+```solidity
+function cancelOrder(uint256 _id) public {
+    _Order storage _order = orders[_id];
+    require(address(_order.user) == msg.sender);
+    require(_order.id == _id);
+    orderCancelled[_id] = true;
+    emit Cancel(_order.id, msg.sender, _order.tokenGet, _order.amountGet, 
+        _order.tokenGive, _order.amountGive, block.timestamp);
+}
+```
+
+**How it works:**
+1. Retrieves order from storage
+2. Verifies caller is order creator
+3. Validates order ID
+4. Marks order as cancelled
+5. Emits Cancel event
+
+**Usage:**
+```javascript
+// Cancel order #3
+await exchange.methods.cancelOrder(3).send({ from: account })
+```
+
+**Important Notes:**
+- Only order creator can cancel
+- Cannot cancel filled orders
+- Cancelled orders cannot be filled
+- No funds are moved during cancellation
+
+**Gas Cost:** ~50,000 gas
+
+### Helper Functions
+
+#### balanceOf()
+
+```solidity
+function balanceOf(address _token, address _user) 
+    public view returns (uint256) {
+    return tokens[_token][_user];
+}
+```
+
+**How it works:**
+- View function (no gas cost when called externally)
+- Returns user's balance of specified token on exchange
+- Does NOT return wallet balance
+
+**Usage:**
+```javascript
+// Check ETH balance on exchange
+const ethBalance = await exchange.methods
+  .balanceOf(ETHER_ADDRESS, account)
+  .call()
+
+// Check token balance on exchange
+const tokenBalance = await exchange.methods
+  .balanceOf(tokenAddress, account)
+  .call()
+
+console.log(`ETH: ${web3.utils.fromWei(ethBalance)}`)
+console.log(`DAPP: ${web3.utils.fromWei(tokenBalance)}`)
+```
+
+**Gas Cost:** Free (read-only)
+
+### Internal Functions
+
+#### _trade()
+
+```solidity
+function _trade(
+    uint256 _orderId, 
+    address _user, 
+    address _tokenGet, 
+    uint256 _amountGet, 
+    address _tokenGive, 
+    uint256 _amountGive
+) internal {
+    uint256 _feeAmount = (_amountGet * feePercent) / 100;
+    
+    // Execute trade
+    tokens[_tokenGet][msg.sender] = 
+        tokens[_tokenGet][msg.sender] - (_amountGet + _feeAmount);
+    tokens[_tokenGet][_user] = tokens[_tokenGet][_user] + _amountGet;
+    tokens[_tokenGet][feeAccount] = tokens[_tokenGet][feeAccount] + _feeAmount;
+    tokens[_tokenGive][_user] = tokens[_tokenGive][_user] - _amountGive;
+    tokens[_tokenGive][msg.sender] = 
+        tokens[_tokenGive][msg.sender] + _amountGive;
+    
+    emit Trade(_orderId, _user, _tokenGet, _amountGet, 
+        _tokenGive, _amountGive, msg.sender, block.timestamp);
+}
+```
+
+**How it works:**
+1. Calculate fee on received amount
+2. Deduct tokens from filler (including fee)
+3. Credit tokens to maker
+4. Credit fee to fee account
+5. Deduct tokens from maker
+6. Credit tokens to filler
+7. Emit Trade event
+
+**Example Trade Flow:**
+
+Order: Sell 100 DAPP for 10 ETH (10% fee)
+
+```
+Before Trade:
+Maker: 100 DAPP, 0 ETH (on exchange)
+Taker: 0 DAPP, 11 ETH (on exchange)
+Fee Account: 0 DAPP, 0 ETH
+
+After Trade:
+Maker: 0 DAPP, 10 ETH
+Taker: 90 DAPP, 1 ETH  (lost 10 DAPP as fee)
+Fee Account: 10 DAPP, 0 ETH
+```
+
+**Fee Calculation:**
+```javascript
+feeAmount = (amountGet * feePercent) / 100
+// Example: (100 * 10) / 100 = 10 tokens
+```
+
+## 📡 Events Reference
+
+### Deposit Event
+
+```solidity
+event Deposit(
+    address token,    // Token deposited (or ETHER_ADDRESS for ETH)
+    address user,     // User who deposited
+    uint256 amount,   // Amount deposited
+    uint256 balance   // New balance after deposit
+)
+```
+
+**When emitted:** After successful deposit
+
+**Frontend usage:**
+```javascript
+exchange.events.Deposit()
+  .on('data', (event) => {
+    console.log(`${event.returnValues.user} deposited 
+      ${event.returnValues.amount}`)
+    // Update UI balances
+  })
+```
+
+### Withdraw Event
+
+```solidity
+event Withdraw(
+    address token,    // Token withdrawn
+    address user,     // User who withdrew
+    uint256 amount,   // Amount withdrawn
+    uint256 balance   // New balance after withdrawal
+)
+```
+
+**When emitted:** After successful withdrawal
+
+### Order Event
+
+```solidity
+event Order(
+    uint256 id,           // Order ID
+    address user,         // Order creator
+    address tokenGet,     // Token to receive
+    uint256 amountGet,    // Amount to receive
+    address tokenGive,    // Token to give
+    uint256 amountGive,   // Amount to give
+    uint256 timestamp     // Creation time
+)
+```
+
+**When emitted:** After order creation
+
+**Frontend usage:**
+```javascript
+exchange.events.Order()
+  .on('data', (event) => {
+    const order = event.returnValues
+    // Add order to order book
+    dispatch(orderMade(order))
+  })
+```
+
+### Trade Event
+
+```solidity
+event Trade(
+    uint256 id,           // Order ID that was filled
+    address user,         // Original order creator (maker)
+    address tokenGet,     // Token received by maker
+    uint256 amountGet,    // Amount received by maker
+    address tokenGive,    // Token given by maker
+    uint256 amountGive,   // Amount given by maker
+    address userFill,     // User who filled order (taker)
+    uint256 timestamp     // Trade execution time
+)
+```
+
+**When emitted:** After successful trade
+
+**Frontend usage:**
+```javascript
+exchange.events.Trade()
+  .on('data', (event) => {
+    const trade = event.returnValues
+    // Update trades list
+    // Update chart
+    // Update balances
+    dispatch(orderFilled(trade))
+  })
+```
+
+### Cancel Event
+
+```solidity
+event Cancel(
+    uint256 id,           // Order ID
+    address user,         // Order creator
+    address tokenGet,     // Token to receive
+    uint256 amountGet,    // Amount to receive
+    address tokenGive,    // Token to give
+    uint256 amountGive,   // Amount to give
+    uint256 timestamp     // Cancellation time
+)
+```
+
+**When emitted:** After order cancellation
+
+## 🔒 Security Analysis
+
+### Access Control
+
+**Order Cancellation**
+```solidity
+require(address(_order.user) == msg.sender);
+```
+✅ Only order creator can cancel their own orders
+
+**Order Filling**
+- Anyone can fill any open order (by design)
+- Filler must have sufficient balance
+
+### State Protection
+
+**Double Fill Prevention**
+```solidity
+require(!orderFilled[_id]);
+```
+✅ Orders can only be filled once
+
+**Cancel After Fill Prevention**
+```solidity
+require(!orderCancelled[_id]);
+```
+✅ Filled orders cannot be cancelled
+
+### Balance Safety
+
+**Overdraft Prevention**
+```solidity
+require(tokens[_token][msg.sender] >= _amount);
+```
+✅ All operations check sufficient balance
+
+**Integer Overflow**
+- Solidity 0.8.x has built-in overflow checks
+✅ Safe from overflow attacks
+
+### Reentrancy Protection
+
+**Checks-Effects-Interactions Pattern**
+```solidity
+// 1. Checks
+require(tokens[ETHER_ADDRESS][msg.sender] >= _amount);
+
+// 2. Effects
+tokens[ETHER_ADDRESS][msg.sender] -= _amount;
+
+// 3. Interactions
+payable(msg.sender).transfer(_amount);
+```
+✅ State updated before external calls
+
+### Front-Running Mitigation
+
+**Current Status:**
+⚠️ Susceptible to front-running (common in order book DEXs)
+
+**Potential Mitigations:**
+- Implement commit-reveal scheme
+- Use submarine sends
+- Batch orders together
+- Time-weighted average pricing
+
+## ⛽ Gas Optimization
+
+### Storage Optimization
+
+**Current Structure:**
+```solidity
+mapping(address => mapping(address => uint256)) public tokens;
+```
+
+**Why this structure:**
+- Efficient lookups: O(1)
+- No iteration needed
+- Scales well with users
+
+**Alternative considered:**
+```solidity
+struct Balance {
+    address token;
+    uint256 amount;
+}
+mapping(address => Balance[]) public userBalances;
+```
+❌ Less efficient (requires iteration)
+
+### Function Optimization
+
+**Using view functions:**
+```solidity
+function balanceOf(address _token, address _user) 
+    public view returns (uint256)
+```
+✅ No state changes = no gas cost
+
+**Emitting events instead of storing:**
+- Historical data in events (cheap)
+- Only current state in storage (expensive)
+✅ Saves significant gas
+
+### Tips for Users
+
+**Batch operations when possible:**
+```javascript
+// Instead of:
+await exchange.depositToken(token1, amount1)
+await exchange.depositToken(token2, amount2)
+
+// Better: Deposit everything you'll need upfront
+```
+
+**Cancel unused orders:**
+- Frees up order book
+- Prevents accidental fills
+
+## 🧪 Testing Guide
+
+### Unit Tests
+
+**Test Deployment:**
+```javascript
+describe('Exchange deployment', () => {
+  it('tracks the fee account', async () => {
+    const result = await exchange.feeAccount()
+    result.should.equal(feeAccount)
+  })
+  
+  it('tracks the fee percent', async () => {
+    const result = await exchange.feePercent()
+    result.toString().should.equal(feePercent.toString())
+  })
+})
+```
+
+**Test Deposits:**
+```javascript
+describe('depositing Ether', () => {
+  let result, amount
+
+  beforeEach(async () => {
+    amount = ether(1)
+    result = await exchange.depositEther({ 
+      from: user1, 
+      value: amount 
+    })
+  })
+
+  it('tracks the Ether deposit', async () => {
+    const balance = await exchange.balanceOf(ETHER_ADDRESS, user1)
+    balance.toString().should.equal(amount.toString())
+  })
+
+  it('emits a Deposit event', async () => {
+    const log = result.logs[0]
+    log.event.should.eq('Deposit')
+    const event = log.args
+    event.token.should.equal(ETHER_ADDRESS)
+    event.user.should.equal(user1)
+    event.amount.toString().should.equal(amount.toString())
+  })
+})
+```
+
+**Test Order Creation:**
+```javascript
+describe('making orders', () => {
+  let result
+
+  beforeEach(async () => {
+    result = await exchange.makeOrder(
+      token.address,
+      tokens(1),
+      ETHER_ADDRESS,
+      ether(1),
+      { from: user1 }
+    )
+  })
+
+  it('tracks the newly created order', async () => {
+    const orderCount = await exchange.orderCount()
+    orderCount.toString().should.equal('1')
+    
+    const order = await exchange.orders('1')
+    order.id.toString().should.equal('1')
+    order.user.should.equal(user1)
+    order.tokenGet.should.equal(token.address)
+    order.amountGet.toString().should.equal(tokens(1).toString())
+    order.tokenGive.should.equal(ETHER_ADDRESS)
+    order.amountGive.toString().should.equal(ether(1).toString())
+  })
+})
+```
+
+### Integration Tests
+
+**Complete Trading Flow:**
+```javascript
+describe('filling orders', () => {
+  describe('success', () => {
+    beforeEach(async () => {
+      // user1 makes order to buy tokens with Ether
+      await exchange.makeOrder(
+        token.address, 
+        tokens(1), 
+        ETHER_ADDRESS, 
+        ether(1), 
+        { from: user1 }
+      )
+      
+      // user2 fills the order
+      result = await exchange.fillOrder('1', { from: user2 })
+    })
+
+    it('executes the trade and charges fees', async () => {
+      let balance
+      
+      // User1 received tokens
+      balance = await exchange.balanceOf(token.address, user1)
+      balance.toString().should.equal(tokens(1).toString())
+      
+      // User1 gave Ether
+      balance = await exchange.balanceOf(ETHER_ADDRESS, user1)
+      balance.toString().should.equal('0')
+      
+      // User2 received Ether
+      balance = await exchange.balanceOf(ETHER_ADDRESS, user2)
+      balance.toString().should.equal(ether(1).toString())
+      
+      // User2 gave tokens (minus fee)
+      balance = await exchange.balanceOf(token.address, user2)
+      balance.toString().should.equal(tokens(0.9).toString())
+      
+      // Fee account received fee
+      balance = await exchange.balanceOf(token.address, feeAccount)
+      balance.toString().should.equal(tokens(0.1).toString())
+    })
+
+    it('emits a Trade event', async () => {
+      const log = result.logs[0]
+      log.event.should.eq('Trade')
+      const event = log.args
+      event.id.toString().should.equal('1')
+      event.user.should.equal(user1)
+      event.userFill.should.equal(user2)
+    })
+
+    it('updates filled orders', async () => {
+      const orderFilled = await exchange.orderFilled(1)
+      orderFilled.should.equal(true)
+    })
+  })
+})
+```
+
+## 📊 Common Patterns
+
+### Safe Deposit Pattern
+
+```javascript
+async function safeDepositToken(token, exchange, amount, account) {
+  try {
+    // 1. Check wallet balance
+    const walletBalance = await token.methods.balanceOf(account).call()
+    if (walletBalance < amount) {
+      throw new Error('Insufficient wallet balance')
+    }
+
+    // 2. Check/set allowance
+    const allowance = await token.methods
+      .allowance(account, exchange.address)
+      .call()
+    
+    if (allowance < amount) {
+      await token.methods
+        .approve(exchange.address, amount)
+        .send({ from: account })
+    }
+
+    // 3. Deposit
+    await exchange.methods
+      .depositToken(token.address, amount)
+      .send({ from: account })
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+```
+
+### Safe Order Creation Pattern
+
+```javascript
+async function safeCreateOrder(
+  exchange,
+  tokenGet,
+  amountGet,
+  tokenGive,
+  amountGive,
+  account
+) {
+  try {
+    // 1. Check exchange balance
+    const balance = await exchange.methods
+      .balanceOf(tokenGive, account)
+      .call()
+
+    if (balance < amountGive) {
+      throw new Error('Insufficient balance on exchange')
+    }
+
+    // 2. Create order
+    const result = await exchange.methods
+      .makeOrder(tokenGet, amountGet, tokenGive, amountGive)
+      .send({ from: account })
+
+    return { success: true, orderId: result.events.Order.returnValues.id }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+```
+
+## 🚀 Advanced Topics
+
+### Order Matching Engine (Frontend)
+
+The contract doesn't automatically match orders. The frontend must:
+
+1. **Fetch all orders** from events
+2. **Filter** open orders
+3. **Sort** by price and time
+4. **Display** in order book
+5. **Allow** user to manually fill
+
+### Price Calculation
+
+```javascript
+function calculatePrice(order) {
+  // For buy order (tokenGet = DAPP, tokenGive = ETH)
+  const price = order.amountGive / order.amountGet
+  // Example: 10 ETH / 100 DAPP = 0.1 ETH per DAPP
+  return price
+}
+```
+
+### Slippage Protection (Future Enhancement)
+
+```solidity
+// Could add minimum received amount
+function fillOrderWithSlippage(
+    uint256 _id, 
+    uint256 _minReceived
+) public {
+    // Ensure order hasn't changed unfavorably
+    require(order.amountGive >= _minReceived);
+    // ... rest of fill logic
+}
+```
+
+## 📚 Further Resources
+
+- [Solidity Documentation](https://docs.soliditylang.org)
+- [Ethereum Smart Contracts](https://ethereum.org/en/developers/docs/smart-contracts/)
+- [Smart Contract Security Best Practices](https://consensys.github.io/smart-contract-best-practices/)
+- [Gas Optimization Techniques](https://ethereum.org/en/developers/docs/gas/)
+
+## 🔗 Related Documentation
+
+- [Token Contract Details](/smart-contracts/token)
+- [Frontend Integration](/frontend)
+- [State Management](/state-management)
+- [API Reference](/api-reference)
+
+---
+
+**Ready to deploy?** Check out the [Deployment Guide](/deployment) for step-by-step instructions.
+
+**Found a bug?** Report it on [GitHub Issues](https://github.com/Hrsh111/Dapp-Forge/issues).

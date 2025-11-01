@@ -1,0 +1,980 @@
+# Token Contract Deep Dive
+
+Complete technical documentation for the Token.sol smart contract - the ERC-20 token implementation used in Dapp-Forge.
+
+## 📋 Contract Overview
+
+The Token contract is a standard ERC-20 token implementation that provides the basic functionality for creating, transferring, and managing fungible tokens on the Ethereum blockchain.
+
+### Contract Details
+- **Standard**: ERC-20
+- **Language**: Solidity ^0.8.0
+- **License**: MIT
+- **Decimals**: 18 (standard)
+
+### What is ERC-20?
+
+ERC-20 is the technical standard for fungible tokens on Ethereum. "Fungible" means each token is identical and interchangeable (like dollars or bitcoins).
+
+**Key characteristics:**
+- ✅ Standardized interface
+- ✅ Compatible with all ERC-20 wallets and exchanges
+- ✅ Well-tested and battle-proven
+- ✅ Wide ecosystem support
+
+## 🏗️ Contract Structure
+
+### State Variables
+
+```solidity
+string public name;                          // Token name (e.g., "Dapp Token")
+string public symbol;                        // Token symbol (e.g., "DAPP")
+uint256 public decimals = 18;                // Decimal places (standard: 18)
+uint256 public totalSupply;                  // Total tokens in existence
+
+mapping(address => uint256) public balanceOf;                     // User balances
+mapping(address => mapping(address => uint256)) public allowance; // Spending approvals
+```
+
+### Storage Layout Explained
+
+**balanceOf Mapping:**
+```
+balanceOf[userAddress] = tokenBalance
+```
+Tracks how many tokens each address owns.
+
+**allowance Mapping:**
+```
+allowance[ownerAddress][spenderAddress] = allowedAmount
+```
+Tracks how many tokens a spender is allowed to transfer on behalf of an owner.
+
+**Example:**
+```javascript
+// Alice allows Bob to spend 100 tokens
+allowance[Alice][Bob] = 100
+
+// Bob can now transfer up to 100 tokens from Alice's account
+// Alice still owns the tokens until Bob transfers them
+```
+
+## 🔧 Core Functions
+
+### Constructor
+
+```solidity
+constructor(
+    string memory _name,
+    string memory _symbol,
+    uint256 _totalSupply
+) {
+    name = _name;
+    symbol = _symbol;
+    totalSupply = _totalSupply;
+    balanceOf[msg.sender] = totalSupply;
+}
+```
+
+**How it works:**
+1. Sets token name and symbol
+2. Sets total supply
+3. Gives all tokens to contract deployer
+4. Called only once at deployment
+
+**Example Deployment:**
+```javascript
+const token = await Token.new(
+  'Dapp Token',                      // name
+  'DAPP',                            // symbol
+  web3.utils.toWei('1000000', 'ether') // 1 million tokens
+)
+```
+
+**Initial State After Deployment:**
+```
+name: "Dapp Token"
+symbol: "DAPP"
+decimals: 18
+totalSupply: 1000000000000000000000000 (1M with 18 decimals)
+balanceOf[deployer]: 1000000000000000000000000
+```
+
+### Transfer Function
+
+```solidity
+function transfer(address _to, uint256 _value) 
+    public returns (bool success) {
+    require(balanceOf[msg.sender] >= _value);
+    _transfer(msg.sender, _to, _value);
+    return true;
+}
+```
+
+**How it works:**
+1. Checks sender has sufficient balance
+2. Calls internal _transfer function
+3. Returns true on success
+
+**Usage:**
+```javascript
+// Send 100 tokens to another address
+await token.methods.transfer(
+  recipientAddress,
+  web3.utils.toWei('100', 'ether')
+).send({ from: senderAddress })
+```
+
+**What happens:**
+```
+Before:
+sender: 1000 tokens
+recipient: 500 tokens
+
+After:
+sender: 900 tokens
+recipient: 600 tokens
+```
+
+**Requirements:**
+- Sender must have >= _value tokens
+- _to address must not be 0x0
+- _value must be > 0
+
+**Gas Cost:** ~50,000 gas
+
+### Approve Function
+
+```solidity
+function approve(address _spender, uint256 _value) 
+    public returns (bool success) {
+    require(_spender != address(0));
+    allowance[msg.sender][_spender] = _value;
+    emit Approval(msg.sender, _spender, _value);
+    return true;
+}
+```
+
+**How it works:**
+1. Validates spender address
+2. Sets allowance amount
+3. Emits Approval event
+4. Returns true
+
+**Usage:**
+```javascript
+// Allow exchange to spend 1000 tokens on your behalf
+await token.methods.approve(
+  exchangeAddress,
+  web3.utils.toWei('1000', 'ether')
+).send({ from: account })
+```
+
+**Real-World Example:**
+
+```javascript
+// Step 1: User approves exchange
+await token.approve(exchangeAddress, 1000)
+
+// Now exchange can call transferFrom to move user's tokens
+// (This happens when depositing to exchange)
+
+// Step 2: Exchange deposits tokens
+await exchange.depositToken(tokenAddress, 1000)
+// This calls: token.transferFrom(user, exchange, 1000)
+```
+
+**Why is this needed?**
+- Tokens stay in your wallet until actually transferred
+- Exchange can't take more than approved amount
+- You maintain control until explicitly moved
+
+**Security Note:**
+⚠️ Setting allowance to 0 before changing is recommended to prevent race conditions:
+
+```javascript
+// Safer approval pattern
+await token.methods.approve(spender, 0).send({ from: account })
+await token.methods.approve(spender, newAmount).send({ from: account })
+```
+
+**Gas Cost:** ~45,000 gas
+
+### TransferFrom Function
+
+```solidity
+function transferFrom(
+    address _from, 
+    address _to, 
+    uint256 _value
+) public returns (bool success) {
+    require(_value <= balanceOf[_from]);
+    require(_value <= allowance[_from][msg.sender]);
+    allowance[_from][msg.sender] = allowance[_from][msg.sender] - _value;
+    _transfer(_from, _to, _value);
+    return true;
+}
+```
+
+**How it works:**
+1. Checks _from has sufficient balance
+2. Checks caller has sufficient allowance
+3. Reduces allowance by _value
+4. Transfers tokens
+5. Returns true
+
+**Usage:**
+```javascript
+// Exchange transferring tokens from user (after approval)
+await token.methods.transferFrom(
+  userAddress,
+  exchangeAddress,
+  web3.utils.toWei('100', 'ether')
+).send({ from: exchangeAddress })
+```
+
+**Flow Example:**
+
+```javascript
+// Initial state
+balanceOf[Alice] = 1000
+balanceOf[Exchange] = 0
+allowance[Alice][Exchange] = 500
+
+// Exchange calls transferFrom
+token.transferFrom(Alice, Exchange, 100)
+
+// Final state
+balanceOf[Alice] = 900
+balanceOf[Exchange] = 100
+allowance[Alice][Exchange] = 400  // Reduced by 100
+```
+
+**Requirements:**
+- _from must have >= _value tokens
+- Caller must have >= _value allowance from _from
+- _to address must not be 0x0
+
+**Gas Cost:** ~55,000 gas (slightly more than transfer)
+
+### Internal Transfer Function
+
+```solidity
+function _transfer(address _from, address _to, uint256 _value) internal {
+    require(_to != address(0));
+    balanceOf[_from] = balanceOf[_from] - _value;
+    balanceOf[_to] = balanceOf[_to] + _value;
+    emit Transfer(_from, _to, _value);
+}
+```
+
+**How it works:**
+1. Validates recipient address
+2. Deducts from sender balance
+3. Adds to recipient balance
+4. Emits Transfer event
+
+**Why internal?**
+- Shared logic for transfer() and transferFrom()
+- Ensures consistent behavior
+- Reduces code duplication
+- Cannot be called directly from outside
+
+**Order of operations is important:**
+```solidity
+// ✅ Correct: Deduct first, then add
+balanceOf[_from] -= _value;  // Sender loses tokens
+balanceOf[_to] += _value;    // Recipient gains tokens
+
+// ❌ Wrong order could allow reentrancy exploits
+```
+
+## 📡 Events Reference
+
+### Transfer Event
+
+```solidity
+event Transfer(
+    address indexed from,    // Sender address
+    address indexed to,      // Recipient address
+    uint256 value           // Amount transferred
+)
+```
+
+**When emitted:**
+- After successful transfer()
+- After successful transferFrom()
+- During initial token distribution
+
+**Why indexed?**
+The `indexed` keyword allows filtering events by address:
+
+```javascript
+// Listen for transfers TO a specific address
+token.events.Transfer({
+  filter: { to: userAddress }
+})
+  .on('data', (event) => {
+    console.log(`Received ${event.returnValues.value} tokens`)
+  })
+
+// Listen for transfers FROM a specific address
+token.events.Transfer({
+  filter: { from: userAddress }
+})
+  .on('data', (event) => {
+    console.log(`Sent ${event.returnValues.value} tokens`)
+  })
+```
+
+**Frontend usage:**
+```javascript
+// Update balance when receiving tokens
+token.events.Transfer({
+  filter: { to: account }
+})
+  .on('data', (event) => {
+    // Refresh balance display
+    loadBalance(account)
+  })
+```
+
+### Approval Event
+
+```solidity
+event Approval(
+    address indexed owner,      // Token owner
+    address indexed spender,    // Approved spender
+    uint256 value              // Approved amount
+)
+```
+
+**When emitted:**
+- After successful approve() call
+- Can emit with 0 value (revoke approval)
+
+**Frontend usage:**
+```javascript
+// Confirm approval succeeded
+token.events.Approval({
+  filter: { owner: account, spender: exchangeAddress }
+})
+  .on('data', (event) => {
+    console.log(`Approved ${event.returnValues.value} tokens`)
+    // Proceed with deposit
+  })
+```
+
+## 🔍 View Functions
+
+### balanceOf()
+
+```solidity
+function balanceOf(address _owner) 
+    public view returns (uint256 balance)
+```
+
+**Purpose:** Check token balance of any address
+
+**Usage:**
+```javascript
+const balance = await token.methods.balanceOf(address).call()
+console.log(`Balance: ${web3.utils.fromWei(balance)} DAPP`)
+```
+
+**Gas Cost:** Free (read-only)
+
+**Example:**
+```javascript
+// Check your balance
+const myBalance = await token.methods.balanceOf(account).call()
+
+// Check exchange balance
+const exchangeBalance = await token.methods.balanceOf(exchangeAddress).call()
+
+// Check total circulating supply by checking all known addresses
+const totalCirculating = await Promise.all([
+  token.methods.balanceOf(address1).call(),
+  token.methods.balanceOf(address2).call(),
+  token.methods.balanceOf(address3).call()
+])
+```
+
+### allowance()
+
+```solidity
+function allowance(address _owner, address _spender) 
+    public view returns (uint256 remaining)
+```
+
+**Purpose:** Check approved spending amount
+
+**Usage:**
+```javascript
+const allowance = await token.methods
+  .allowance(ownerAddress, spenderAddress)
+  .call()
+
+console.log(`Approved: ${web3.utils.fromWei(allowance)} DAPP`)
+```
+
+**Gas Cost:** Free (read-only)
+
+**Example:**
+```javascript
+// Check if exchange has enough allowance before depositing
+const allowance = await token.methods
+  .allowance(account, exchangeAddress)
+  .call()
+
+const depositAmount = web3.utils.toWei('100', 'ether')
+
+if (allowance < depositAmount) {
+  // Need to approve first
+  await token.methods
+    .approve(exchangeAddress, depositAmount)
+    .send({ from: account })
+}
+```
+
+## 💡 Understanding Decimals
+
+### What are decimals?
+
+Tokens have no fractional values in smart contracts. Instead, we use decimals to represent fractions:
+
+```
+Decimals: 18 (standard for ERC-20)
+
+Human-readable: 1.5 tokens
+Contract value:  1500000000000000000 wei
+
+Human-readable: 0.001 tokens
+Contract value:  1000000000000000 wei
+```
+
+### Why 18 decimals?
+
+- Matches ETH's decimals
+- Allows for very small fractions
+- Standard across most tokens
+- Compatible with exchanges
+
+### Working with decimals:
+
+**JavaScript/Web3.js:**
+```javascript
+// Convert human-readable to wei (contract format)
+const amount = web3.utils.toWei('1.5', 'ether')
+// Result: "1500000000000000000"
+
+// Convert wei to human-readable
+const readable = web3.utils.fromWei('1500000000000000000', 'ether')
+// Result: "1.5"
+```
+
+**Solidity:**
+```solidity
+// Already in wei format in contracts
+uint256 oneToken = 1 * 10**18;      // 1 token
+uint256 halfToken = 5 * 10**17;     // 0.5 tokens
+uint256 hundredTokens = 100 * 10**18; // 100 tokens
+```
+
+### Common mistakes:
+
+```javascript
+// ❌ Wrong: Forgetting to convert
+await token.transfer(recipient, 100)  // Sends 0.0000...001 tokens!
+
+// ✅ Correct: Always convert
+await token.transfer(recipient, web3.utils.toWei('100', 'ether'))
+```
+
+## 🔒 Security Features
+
+### Integer Overflow Protection
+
+**Solidity 0.8.x automatic checks:**
+```solidity
+// Before Solidity 0.8.x, this could overflow:
+uint256 balance = 2**256 - 1;
+balance = balance + 1;  // Would wrap to 0!
+
+// Solidity 0.8.x automatically reverts on overflow
+// ✅ Safe: Transaction fails instead of wrapping
+```
+
+### Zero Address Checks
+
+```solidity
+require(_to != address(0));
+```
+
+**Why important:**
+- Sending to 0x0 burns tokens (unrecoverable)
+- Common mistake by users
+- Protection against accidents
+
+### Balance Validation
+
+```solidity
+require(balanceOf[msg.sender] >= _value);
+```
+
+**Prevents:**
+- Spending more than you have
+- Negative balances
+- Unauthorized transfers
+
+### Allowance Checks
+
+```solidity
+require(_value <= allowance[_from][msg.sender]);
+```
+
+**Prevents:**
+- Spending more than approved
+- Unauthorized transferFrom calls
+- Allowance exploitation
+
+## 🧪 Testing Guide
+
+### Basic Tests
+
+**Test Deployment:**
+```javascript
+describe('Token deployment', () => {
+  it('tracks the name', async () => {
+    const result = await token.name()
+    result.should.equal('Dapp Token')
+  })
+
+  it('tracks the symbol', async () => {
+    const result = await token.symbol()
+    result.should.equal('DAPP')
+  })
+
+  it('tracks the decimals', async () => {
+    const result = await token.decimals()
+    result.toString().should.equal('18')
+  })
+
+  it('tracks the total supply', async () => {
+    const result = await token.totalSupply()
+    result.toString().should.equal(totalSupply.toString())
+  })
+
+  it('assigns the total supply to the deployer', async () => {
+    const result = await token.balanceOf(deployer)
+    result.toString().should.equal(totalSupply.toString())
+  })
+})
+```
+
+**Test Transfers:**
+```javascript
+describe('sending tokens', () => {
+  let amount, result
+
+  describe('success', () => {
+    beforeEach(async () => {
+      amount = tokens(100)
+      result = await token.transfer(receiver, amount, { from: deployer })
+    })
+
+    it('transfers token balances', async () => {
+      let balance
+      
+      balance = await token.balanceOf(deployer)
+      balance.toString().should.equal(tokens(999900).toString())
+      
+      balance = await token.balanceOf(receiver)
+      balance.toString().should.equal(tokens(100).toString())
+    })
+
+    it('emits a Transfer event', async () => {
+      const log = result.logs[0]
+      log.event.should.eq('Transfer')
+      const event = log.args
+      event.from.toString().should.equal(deployer, 'from is correct')
+      event.to.should.equal(receiver, 'to is correct')
+      event.value.toString().should.equal(amount.toString(), 'value is correct')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects insufficient balances', async () => {
+      let invalidAmount = tokens(100000000) // 100 million - more than supply
+      await token.transfer(receiver, invalidAmount, { from: deployer })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects invalid recipients', async () => {
+      await token.transfer(0x0, amount, { from: deployer })
+        .should.be.rejected
+    })
+  })
+})
+```
+
+**Test Approvals:**
+```javascript
+describe('approving tokens', () => {
+  let result, amount
+
+  beforeEach(async () => {
+    amount = tokens(100)
+    result = await token.approve(exchange, amount, { from: deployer })
+  })
+
+  describe('success', () => {
+    it('allocates an allowance for delegated token spending', async () => {
+      const allowance = await token.allowance(deployer, exchange)
+      allowance.toString().should.equal(amount.toString())
+    })
+
+    it('emits an Approval event', async () => {
+      const log = result.logs[0]
+      log.event.should.eq('Approval')
+      const event = log.args
+      event.owner.toString().should.equal(deployer, 'owner is correct')
+      event.spender.should.equal(exchange, 'spender is correct')
+      event.value.toString().should.equal(amount.toString(), 'value is correct')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects invalid spenders', async () => {
+      await token.approve(0x0, amount, { from: deployer }).should.be.rejected
+    })
+  })
+})
+```
+
+**Test TransferFrom:**
+```javascript
+describe('delegated token transfers', () => {
+  let amount, result
+
+  beforeEach(async () => {
+    amount = tokens(100)
+    await token.approve(exchange, amount, { from: deployer })
+  })
+
+  describe('success', () => {
+    beforeEach(async () => {
+      result = await token.transferFrom(deployer, receiver, amount, { from: exchange })
+    })
+
+    it('transfers token balances', async () => {
+      let balance
+      balance = await token.balanceOf(deployer)
+      balance.toString().should.equal(tokens(999900).toString())
+      balance = await token.balanceOf(receiver)
+      balance.toString().should.equal(tokens(100).toString())
+    })
+
+    it('resets the allowance', async () => {
+      const allowance = await token.allowance(deployer, exchange)
+      allowance.toString().should.equal('0')
+    })
+
+    it('emits a Transfer event', async () => {
+      const log = result.logs[0]
+      log.event.should.eq('Transfer')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects insufficient amounts', async () => {
+      const invalidAmount = tokens(100000000)
+      await token.transferFrom(deployer, receiver, invalidAmount, { from: exchange })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects invalid recipients', async () => {
+      await token.transferFrom(deployer, 0x0, amount, { from: exchange })
+        .should.be.rejected
+    })
+  })
+})
+```
+
+## 📊 Common Patterns
+
+### Safe Approval Pattern
+
+```javascript
+async function safeApprove(token, spender, amount, account) {
+  try {
+    // Check current allowance
+    const currentAllowance = await token.methods
+      .allowance(account, spender)
+      .call()
+
+    // If already has enough allowance, skip
+    if (Number(currentAllowance) >= Number(amount)) {
+      return { success: true, message: 'Sufficient allowance' }
+    }
+
+    // Reset allowance to 0 first (safety)
+    if (Number(currentAllowance) > 0) {
+      await token.methods
+        .approve(spender, 0)
+        .send({ from: account })
+    }
+
+    // Set new allowance
+    await token.methods
+      .approve(spender, amount)
+      .send({ from: account })
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+```
+
+### Batch Transfer Pattern
+
+```javascript
+async function batchTransfer(token, recipients, amounts, from) {
+  const results = []
+  
+  for (let i = 0; i < recipients.length; i++) {
+    try {
+      await token.methods
+        .transfer(recipients[i], amounts[i])
+        .send({ from })
+      
+      results.push({ 
+        recipient: recipients[i], 
+        success: true 
+      })
+    } catch (error) {
+      results.push({ 
+        recipient: recipients[i], 
+        success: false, 
+        error: error.message 
+      })
+    }
+  }
+  
+  return results
+}
+
+// Usage
+await batchTransfer(
+  token,
+  ['0x123...', '0x456...', '0x789...'],
+  [tokens(10), tokens(20), tokens(30)],
+  deployer
+)
+```
+
+### Balance Monitor Pattern
+
+```javascript
+async function monitorBalance(token, address, callback) {
+  // Listen for incoming transfers
+  token.events.Transfer({
+    filter: { to: address }
+  })
+    .on('data', async (event) => {
+      const newBalance = await token.methods.balanceOf(address).call()
+      callback({
+        type: 'received',
+        amount: event.returnValues.value,
+        from: event.returnValues.from,
+        newBalance
+      })
+    })
+
+  // Listen for outgoing transfers
+  token.events.Transfer({
+    filter: { from: address }
+  })
+    .on('data', async (event) => {
+      const newBalance = await token.methods.balanceOf(address).call()
+      callback({
+        type: 'sent',
+        amount: event.returnValues.value,
+        to: event.returnValues.to,
+        newBalance
+      })
+    })
+}
+
+// Usage
+monitorBalance(token, myAddress, (event) => {
+  console.log(`Balance changed: ${event.type}`)
+  console.log(`New balance: ${web3.utils.fromWei(event.newBalance)}`)
+})
+```
+
+## 🚀 Advanced Topics
+
+### Token Distribution Strategies
+
+**1. Initial Distribution:**
+```solidity
+constructor() {
+    balanceOf[msg.sender] = totalSupply;  // All to deployer
+}
+```
+
+**2. Multi-address Distribution:**
+```javascript
+async function distributeTokens(token, distribution) {
+  for (const [address, amount] of Object.entries(distribution)) {
+    await token.methods.transfer(address, amount)
+      .send({ from: deployer })
+  }
+}
+
+// Usage
+await distributeTokens(token, {
+  '0x123...': tokens(10000),   // Team
+  '0x456...': tokens(5000),    // Advisors
+  '0x789...': tokens(85000)    // Public sale contract
+})
+```
+
+### Vesting Implementation
+
+```solidity
+// Simple time-locked transfer (add to Token.sol)
+mapping(address => uint256) public unlockTime;
+
+function transferWithLock(
+    address _to, 
+    uint256 _value, 
+    uint256 _unlockTime
+) public returns (bool) {
+    require(block.timestamp >= unlockTime[msg.sender]);
+    unlockTime[_to] = _unlockTime;
+    return transfer(_to, _value);
+}
+```
+
+### Pausable Transfers
+
+```solidity
+// Emergency pause functionality (add to Token.sol)
+bool public paused = false;
+address public owner;
+
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+}
+
+function pause() public {
+    require(msg.sender == owner);
+    paused = true;
+}
+
+function unpause() public {
+    require(msg.sender == owner);
+    paused = false;
+}
+
+// Modify transfer functions
+function transfer(address _to, uint256 _value) 
+    public whenNotPaused returns (bool success) {
+    // ... existing code
+}
+```
+
+## 📚 ERC-20 Standard Compliance
+
+### Required Functions
+✅ `totalSupply()`
+✅ `balanceOf(address)`
+✅ `transfer(address, uint256)`
+✅ `transferFrom(address, address, uint256)`
+✅ `approve(address, uint256)`
+✅ `allowance(address, address)`
+
+### Required Events
+✅ `Transfer(address, address, uint256)`
+✅ `Approval(address, address, uint256)`
+
+### Optional Functions
+❌ `name()` - Implemented
+❌ `symbol()` - Implemented
+❌ `decimals()` - Implemented
+
+### Compliance Checklist
+
+- ✅ All required functions implemented
+- ✅ All required events implemented
+- ✅ Functions return correct values
+- ✅ Events emitted correctly
+- ✅ Overflows protected (Solidity 0.8+)
+- ✅ Compatible with standard wallets
+- ✅ Compatible with exchanges
+
+## 🔗 Integration Examples
+
+### MetaMask Integration
+
+```javascript
+// Add token to MetaMask
+async function addTokenToMetaMask(tokenAddress, symbol, decimals) {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_watchAsset',
+      params: {
+        type: 'ERC20',
+        options: {
+          address: tokenAddress,
+          symbol: symbol,
+          decimals: decimals
+        }
+      }
+    })
+  } catch (error) {
+    console.log('User rejected token addition')
+  }
+}
+
+// Usage
+await addTokenToMetaMask(
+  token.address,
+  'DAPP',
+  18
+)
+```
+
+### Exchange Integration
+
+```javascript
+// Deposit tokens to exchange
+async function depositToExchange(token, exchange, amount, account) {
+  // Step 1: Approve
+  await token.methods
+    .approve(exchange.address, amount)
+    .send({ from: account })
+
+  // Step 2: Deposit
+  await exchange.methods
+    .depositToken(token.address, amount)
+    .send({ from: account })
+
+  console.log('Tokens deposited successfully')
+}
+```
+
+## 🔗 Related Documentation
+
+- [Exchange Contract](/smart-contracts/exchange)
+- [Smart Contracts Overview](/smart-contracts)
+- [Frontend Integration](/frontend)
+- [API Reference](/api-reference)
+
+---
+
+**Questions?** Check the [Getting Started Guide](/getting-started) or visit our [GitHub Discussions](https://github.com/Hrsh111/Dapp-Forge/discussions).

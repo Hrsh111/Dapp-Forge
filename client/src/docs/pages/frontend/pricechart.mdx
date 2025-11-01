@@ -1,0 +1,918 @@
+# PriceChart Component
+
+Interactive candlestick chart displaying token price movements using ApexCharts.
+
+## 📋 Overview
+
+**File:** `src/components/PriceChart.js`
+
+**Purpose:**
+- Visualize price movements over time
+- Display OHLC (Open, High, Low, Close) data
+- Show trading volume
+- Provide interactive chart controls
+- Real-time price updates
+
+## 🎨 Visual Structure
+
+```
+┌────────────────────────────────────────┐
+│          Price Chart                   │
+├────────────────────────────────────────┤
+│  Price: 0.105 ETH  (+5.2%)            │
+├────────────────────────────────────────┤
+│                   ▲                    │
+│    ┃             ┃│                    │
+│  ┃ ┃   ┃      ┃ ┃│┃                   │
+│  ┃ ┃┃  ┃┃  ┃  ┃ ┃│┃                   │
+│  ┃ ┃┃  ┃┃  ┃┃ ┃ ┃│┃  ┃                │
+│ ━┃━┃┃━━┃┃━━┃┃━┃━┃│┃━━┃━▶              │
+│  10:00  10:30  11:00  11:30           │
+└────────────────────────────────────────┘
+```
+
+## 🏗️ Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import Chart from 'react-apexcharts'
+import Spinner from './Spinner'
+import {
+  priceChartLoadedSelector,
+  priceChartSelector
+} from '../store/selectors'
+
+const priceSymbol = (lastPriceChange) => {
+  let output
+  if(lastPriceChange === '+') {
+    output = <span className="text-success">&#9650;</span> // Green up
+  } else {
+    output = <span className="text-danger">&#9660;</span> // Red down
+  }
+  return(output)
+}
+
+class PriceChart extends Component {
+  render() {
+    return (
+      <div className="card bg-dark text-white">
+        <div className="card-header">Price Chart</div>
+        <div className="card-body">
+          {this.props.priceChartLoaded ? (
+            this.renderChart()
+          ) : (
+            <Spinner type="div" />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  renderChart() {
+    return (
+      <div className="price-chart">
+        <div className="price-stats">
+          <span className="price-label">DAPP/ETH {priceSymbol(this.props.priceChart.lastPriceChange)}</span>
+          <span className="price-value">{this.props.priceChart.lastPrice}</span>
+        </div>
+        <Chart
+          options={this.props.priceChart.options}
+          series={this.props.priceChart.series}
+          type='candlestick'
+          width='100%'
+          height='100%'
+        />
+      </div>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  return {
+    priceChartLoaded: priceChartLoadedSelector(state),
+    priceChart: priceChartSelector(state)
+  }
+}
+
+export default connect(mapStateToProps)(PriceChart)
+```
+
+## 📊 Chart Configuration
+
+### ApexCharts Options
+
+```javascript
+const chartOptions = {
+  chart: {
+    animations: { enabled: true },
+    toolbar: { show: false },
+    width: '100%'
+  },
+  tooltip: {
+    enabled: true,
+    theme: 'dark',
+    custom: function({ seriesIndex, dataPointIndex, w }) {
+      const o = w.globals.seriesCandleO[seriesIndex][dataPointIndex]
+      const h = w.globals.seriesCandleH[seriesIndex][dataPointIndex]
+      const l = w.globals.seriesCandleL[seriesIndex][dataPointIndex]
+      const c = w.globals.seriesCandleC[seriesIndex][dataPointIndex]
+      return (
+        '<div class="apexcharts-tooltip-candlestick">' +
+          '<div>Open: <span>' + o.toFixed(5) + '</span></div>' +
+          '<div>High: <span>' + h.toFixed(5) + '</span></div>' +
+          '<div>Low: <span>' + l.toFixed(5) + '</span></div>' +
+          '<div>Close: <span>' + c.toFixed(5) + '</span></div>' +
+        '</div>'
+      )
+    }
+  },
+  grid: {
+    show: true,
+    borderColor: '#767F92',
+    strokeDashArray: 0
+  },
+  plotOptions: {
+    candlestick: {
+      colors: {
+        upward: '#25CE8F',
+        downward: '#F45353'
+      }
+    }
+  },
+  xaxis: {
+    type: 'datetime',
+    labels: {
+      style: {
+        colors: '#767F92',
+        fontSize: '14px',
+        cssClass: 'apexcharts-xaxis-label',
+      },
+    }
+  },
+  yaxis: {
+    labels: {
+      style: {
+        colors: '#767F92',
+        fontSize: '14px',
+        cssClass: 'apexcharts-yaxis-label',
+      },
+      formatter: function(val) {
+        return val.toFixed(5)
+      }
+    }
+  }
+}
+```
+
+### Chart Series Data
+
+```javascript
+const series = [
+  {
+    name: 'Price',
+    data: [
+      {
+        x: new Date(1538778600000),
+        y: [0.0995, 0.1020, 0.0990, 0.1015] // [open, high, low, close]
+      },
+      {
+        x: new Date(1538780400000),
+        y: [0.1015, 0.1050, 0.1010, 0.1045]
+      },
+      // More data points...
+    ]
+  }
+]
+```
+
+## 🔄 Data Processing
+
+### Building Chart Data
+
+```javascript
+// store/selectors.js
+export const priceChartSelector = createSelector(
+  filledOrders,
+  orders => {
+    // Sort by timestamp
+    orders = orders.sort((a, b) => a.timestamp - b.timestamp)
+    
+    // Format data for chart
+    orders = orders.map(o => decorateOrder(o))
+    
+    // Group by hour
+    let groupedOrders = groupBy(orders, (o) => 
+      moment.unix(o.timestamp).startOf('hour').format()
+    )
+    
+    // Build candlestick data
+    const series = Object.keys(groupedOrders).map(hour => {
+      const group = groupedOrders[hour]
+      
+      return {
+        x: new Date(hour),
+        y: [
+          group[0].tokenPrice,                    // Open
+          Math.max(...group.map(o => o.tokenPrice)), // High
+          Math.min(...group.map(o => o.tokenPrice)), // Low
+          group[group.length - 1].tokenPrice      // Close
+        ]
+      }
+    })
+    
+    // Calculate last price change
+    const lastPriceChange = series.length >= 2
+      ? series[series.length - 1].y[3] >= series[series.length - 2].y[3] ? '+' : '-'
+      : '+'
+    
+    return {
+      series: [{ name: 'Price', data: series }],
+      options: chartOptions,
+      lastPrice: series.length > 0 
+        ? series[series.length - 1].y[3].toFixed(5) 
+        : '0.00000',
+      lastPriceChange
+    }
+  }
+)
+```
+
+### Time Grouping
+
+**Group by different intervals:**
+```javascript
+groupOrdersByTime(orders, interval = 'hour') {
+  return groupBy(orders, (order) => {
+    switch(interval) {
+      case 'minute':
+        return moment.unix(order.timestamp).startOf('minute').format()
+      case 'hour':
+        return moment.unix(order.timestamp).startOf('hour').format()
+      case 'day':
+        return moment.unix(order.timestamp).startOf('day').format()
+      default:
+        return moment.unix(order.timestamp).startOf('hour').format()
+    }
+  })
+}
+```
+
+### OHLC Calculation
+
+```javascript
+calculateOHLC(trades) {
+  if (trades.length === 0) {
+    return { open: 0, high: 0, low: 0, close: 0 }
+  }
+  
+  const prices = trades.map(t => parseFloat(t.tokenPrice))
+  
+  return {
+    open: prices[0],
+    high: Math.max(...prices),
+    low: Math.min(...prices),
+    close: prices[prices.length - 1]
+  }
+}
+```
+
+## 🎨 Styling
+
+### Chart Container
+
+```css
+.price-chart {
+  height: 100%;
+  min-height: 300px;
+}
+
+.price-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #2c3e50;
+  margin-bottom: 10px;
+}
+
+.price-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.price-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+```
+
+### Custom Tooltip Styling
+
+```css
+.apexcharts-tooltip-candlestick {
+  background: #1a1d24;
+  border: 1px solid #2c3e50;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.apexcharts-tooltip-candlestick div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  color: #fff;
+}
+
+.apexcharts-tooltip-candlestick span {
+  font-weight: 600;
+  margin-left: 10px;
+}
+```
+
+### Color Themes
+
+```javascript
+const chartTheme = {
+  light: {
+    upward: '#26a69a',
+    downward: '#ef5350',
+    grid: '#e0e0e0',
+    text: '#424242'
+  },
+  dark: {
+    upward: '#25CE8F',
+    downward: '#F45353',
+    grid: '#767F92',
+    text: '#767F92'
+  }
+}
+```
+
+## 🎯 Advanced Features
+
+### 1. Time Range Selector
+
+```javascript
+state = {
+  timeRange: '1h'
+}
+
+renderTimeSelector() {
+  const ranges = ['5m', '15m', '1h', '4h', '1d', '1w']
+  
+  return (
+    <div className="time-selector btn-group btn-group-sm">
+      {ranges.map(range => (
+        <button
+          key={range}
+          className={`btn btn-outline-secondary ${
+            this.state.timeRange === range ? 'active' : ''
+          }`}
+          onClick={() => this.setState({ timeRange: range })}
+        >
+          {range}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+getFilteredData() {
+  const { timeRange } = this.state
+  const now = moment()
+  let cutoff
+  
+  switch(timeRange) {
+    case '5m':
+      cutoff = now.subtract(5, 'minutes')
+      break
+    case '15m':
+      cutoff = now.subtract(15, 'minutes')
+      break
+    case '1h':
+      cutoff = now.subtract(1, 'hour')
+      break
+    case '4h':
+      cutoff = now.subtract(4, 'hours')
+      break
+    case '1d':
+      cutoff = now.subtract(1, 'day')
+      break
+    case '1w':
+      cutoff = now.subtract(1, 'week')
+      break
+    default:
+      cutoff = now.subtract(1, 'hour')
+  }
+  
+  return this.props.priceChart.series[0].data.filter(point =>
+    moment(point.x).isAfter(cutoff)
+  )
+}
+```
+
+### 2. Chart Type Toggle
+
+```javascript
+state = {
+  chartType: 'candlestick'
+}
+
+renderChartTypeToggle() {
+  return (
+    <div className="chart-type-toggle">
+      <button
+        className={this.state.chartType === 'candlestick' ? 'active' : ''}
+        onClick={() => this.setState({ chartType: 'candlestick' })}
+      >
+        Candlestick
+      </button>
+      <button
+        className={this.state.chartType === 'line' ? 'active' : ''}
+        onClick={() => this.setState({ chartType: 'line' })}
+      >
+        Line
+      </button>
+      <button
+        className={this.state.chartType === 'area' ? 'active' : ''}
+        onClick={() => this.setState({ chartType: 'area' })}
+      >
+        Area
+      </button>
+    </div>
+  )
+}
+
+render() {
+  return (
+    <Chart
+      options={this.props.priceChart.options}
+      series={this.getSeriesForChartType()}
+      type={this.state.chartType}
+      width='100%'
+      height='100%'
+    />
+  )
+}
+
+getSeriesForChartType() {
+  if (this.state.chartType === 'candlestick') {
+    return this.props.priceChart.series
+  }
+  
+  // Convert candlestick data to line/area
+  return [{
+    name: 'Price',
+    data: this.props.priceChart.series[0].data.map(point => ({
+      x: point.x,
+      y: point.y[3] // Use close price
+    }))
+  }]
+}
+```
+
+### 3. Volume Indicator
+
+```javascript
+renderWithVolume() {
+  const volumeSeries = [{
+    name: 'Volume',
+    type: 'column',
+    data: this.calculateVolume()
+  }]
+  
+  const combinedOptions = {
+    ...chartOptions,
+    chart: {
+      ...chartOptions.chart,
+      height: 450,
+      type: 'candlestick'
+    },
+    plotOptions: {
+      ...chartOptions.plotOptions,
+      bar: {
+        columnWidth: '80%',
+        colors: {
+          ranges: [{
+            from: 0,
+            to: 999999,
+            color: '#26a69a'
+          }]
+        }
+      }
+    },
+    yaxis: [
+      {
+        // Price axis
+        labels: {
+          formatter: (val) => val.toFixed(5)
+        }
+      },
+      {
+        // Volume axis
+        opposite: true,
+        labels: {
+          formatter: (val) => val.toFixed(2)
+        }
+      }
+    ]
+  }
+  
+  return (
+    <Chart
+      options={combinedOptions}
+      series={[...this.props.priceChart.series, ...volumeSeries]}
+      type="candlestick"
+      height={450}
+    />
+  )
+}
+
+calculateVolume() {
+  // Group trades and sum volumes
+  const groupedTrades = groupBy(
+    this.props.filledOrders,
+    o => moment.unix(o.timestamp).startOf('hour').format()
+  )
+  
+  return Object.keys(groupedTrades).map(time => ({
+    x: new Date(time),
+    y: groupedTrades[time].reduce((sum, trade) => 
+      sum + parseFloat(trade.etherAmount), 0
+    )
+  }))
+}
+```
+
+### 4. Technical Indicators
+
+**Moving Average:**
+```javascript
+calculateMovingAverage(data, period) {
+  const ma = []
+  
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1)
+    const sum = slice.reduce((acc, point) => 
+      acc + point.y[3], 0 // Use close price
+    )
+    ma.push({
+      x: data[i].x,
+      y: sum / period
+    })
+  }
+  
+  return ma
+}
+
+renderWithMA() {
+  const ma20 = this.calculateMovingAverage(
+    this.props.priceChart.series[0].data, 
+    20
+  )
+  
+  const series = [
+    ...this.props.priceChart.series,
+    {
+      name: 'MA(20)',
+      type: 'line',
+      data: ma20
+    }
+  ]
+  
+  return <Chart options={chartOptions} series={series} />
+}
+```
+
+**RSI (Relative Strength Index):**
+```javascript
+calculateRSI(data, period = 14) {
+  const changes = []
+  
+  for (let i = 1; i < data.length; i++) {
+    changes.push(data[i].y[3] - data[i-1].y[3])
+  }
+  
+  const gains = changes.map(c => c > 0 ? c : 0)
+  const losses = changes.map(c => c < 0 ? Math.abs(c) : 0)
+  
+  const avgGain = gains.slice(0, period).reduce((a, b) => a + b) / period
+  const avgLoss = losses.slice(0, period).reduce((a, b) => a + b) / period
+  
+  const rs = avgGain / avgLoss
+  const rsi = 100 - (100 / (1 + rs))
+  
+  return rsi
+}
+
+renderRSI() {
+  const rsi = this.calculateRSI(this.props.priceChart.series[0].data)
+  
+  return (
+    <div className="rsi-indicator">
+      <span className="label">RSI(14):</span>
+      <span className={`value ${
+        rsi > 70 ? 'text-danger' : 
+        rsi < 30 ? 'text-success' : 
+        'text-muted'
+      }`}>
+        {rsi.toFixed(2)}
+      </span>
+    </div>
+  )
+}
+```
+
+### 5. Price Alerts
+
+```javascript
+state = {
+  priceAlerts: []
+}
+
+addPriceAlert(price, direction) {
+  this.setState(prev => ({
+    priceAlerts: [
+      ...prev.priceAlerts,
+      {
+        id: Date.now(),
+        price: parseFloat(price),
+        direction, // 'above' or 'below'
+        triggered: false
+      }
+    ]
+  }))
+}
+
+componentDidUpdate(prevProps) {
+  if (prevProps.priceChart.lastPrice !== this.props.priceChart.lastPrice) {
+    this.checkPriceAlerts()
+  }
+}
+
+checkPriceAlerts() {
+  const currentPrice = parseFloat(this.props.priceChart.lastPrice)
+  
+  this.state.priceAlerts.forEach(alert => {
+    if (!alert.triggered) {
+      const shouldTrigger = 
+        (alert.direction === 'above' && currentPrice >= alert.price) ||
+        (alert.direction === 'below' && currentPrice <= alert.price)
+      
+      if (shouldTrigger) {
+        this.triggerAlert(alert)
+      }
+    }
+  })
+}
+
+triggerAlert(alert) {
+  // Show notification
+  new Notification('Price Alert', {
+    body: `Price ${alert.direction} ${alert.price}`,
+    icon: '/logo.png'
+  })
+  
+  // Mark as triggered
+  this.setState(prev => ({
+    priceAlerts: prev.priceAlerts.map(a =>
+      a.id === alert.id ? { ...a, triggered: true } : a
+    )
+  }))
+}
+```
+
+### 6. Export Chart
+
+```javascript
+exportChart(format = 'png') {
+  const chart = this.chartRef.current.chart
+  
+  switch(format) {
+    case 'png':
+      chart.dataURI().then(({ imgURI }) => {
+        const link = document.createElement('a')
+        link.href = imgURI
+        link.download = `price-chart-${Date.now()}.png`
+        link.click()
+      })
+      break
+      
+    case 'svg':
+      chart.dataURI({ scale: 1 }).then(({ imgURI }) => {
+        // Download SVG
+      })
+      break
+      
+    case 'csv':
+      this.exportToCSV()
+      break
+  }
+}
+
+exportToCSV() {
+  const data = this.props.priceChart.series[0].data
+  const csv = [
+    ['Timestamp', 'Open', 'High', 'Low', 'Close'],
+    ...data.map(point => [
+      new Date(point.x).toISOString(),
+      point.y[0],
+      point.y[1],
+      point.y[2],
+      point.y[3]
+    ])
+  ].map(row => row.join(',')).join('\n')
+  
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `price-data-${Date.now()}.csv`
+  link.click()
+}
+```
+
+## 🔄 Real-time Updates
+
+### WebSocket Integration
+
+```javascript
+componentDidMount() {
+  this.subscribeToTrades()
+}
+
+subscribeToTrades() {
+  const { exchange } = this.props
+  
+  this.tradeSubscription = exchange.events.Trade({})
+    .on('data', (event) => {
+      this.handleNewTrade(event)
+    })
+}
+
+handleNewTrade(event) {
+  // Update chart with new trade
+  const trade = {
+    timestamp: event.returnValues.timestamp,
+    price: this.calculatePrice(event.returnValues)
+  }
+  
+  this.updateChart(trade)
+}
+
+componentWillUnmount() {
+  if (this.tradeSubscription) {
+    this.tradeSubscription.unsubscribe()
+  }
+}
+```
+
+### Animation on Update
+
+```javascript
+const chartOptions = {
+  chart: {
+    animations: {
+      enabled: true,
+      easing: 'easeinout',
+      speed: 800,
+      animateGradually: {
+        enabled: true,
+        delay: 150
+      },
+      dynamicAnimation: {
+        enabled: true,
+        speed: 350
+      }
+    }
+  }
+}
+```
+
+## 🧪 Testing
+
+```javascript
+import { render, screen } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import PriceChart from './PriceChart'
+import configureStore from '../store/configureStore'
+
+describe('PriceChart Component', () => {
+  let store
+
+  beforeEach(() => {
+    const mockData = {
+      series: [{
+        data: [
+          { x: new Date(), y: [0.1, 0.11, 0.09, 0.105] }
+        ]
+      }],
+      lastPrice: '0.10500',
+      lastPriceChange: '+'
+    }
+    
+    store = configureStore({
+      priceChart: mockData
+    })
+  })
+
+  it('renders price chart', () => {
+    render(
+      <Provider store={store}>
+        <PriceChart />
+      </Provider>
+    )
+    
+    expect(screen.getByText(/Price Chart/i)).toBeInTheDocument()
+  })
+
+  it('displays current price', () => {
+    render(
+      <Provider store={store}>
+        <PriceChart />
+      </Provider>
+    )
+    
+    expect(screen.getByText(/0\.10500/)).toBeInTheDocument()
+  })
+
+  it('shows price change indicator', () => {
+    render(
+      <Provider store={store}>
+        <PriceChart />
+      </Provider>
+    )
+    
+    // Check for up arrow (green triangle)
+    expect(screen.getByText('▲')).toBeInTheDocument()
+  })
+})
+```
+
+## 🐛 Common Issues
+
+### Issue 1: Chart Not Rendering
+
+**Problem:** Chart container is empty
+
+**Solution:** Check data format
+```javascript
+// Ensure data is in correct format
+console.log('Chart data:', this.props.priceChart.series)
+
+// Verify ApexCharts is loaded
+if (typeof Chart === 'undefined') {
+  console.error('ApexCharts not loaded')
+}
+```
+
+### Issue 2: Tooltip Not Showing
+
+**Problem:** Custom tooltip doesn't display
+
+**Solution:** Fix tooltip formatter
+```javascript
+tooltip: {
+  enabled: true,
+  custom: function({ seriesIndex, dataPointIndex, w }) {
+    // Ensure data exists
+    if (!w.globals.seriesCandleO) return ''
+    
+    // Return valid HTML
+    return '<div>...</div>'
+  }
+}
+```
+
+### Issue 3: Performance with Large Datasets
+
+**Problem:** Chart lags with many data points
+
+**Solution:** Implement data decimation
+```javascript
+decimateData(data, maxPoints = 100) {
+  if (data.length <= maxPoints) return data
+  
+  const step = Math.ceil(data.length / maxPoints)
+  return data.filter((_, index) => index % step === 0)
+}
+```
+
+## 🔗 Related Components
+
+- [OrderBook](/frontend/orderbook) - Order prices feed chart
+- [Trades](/frontend/trades) - Trade data source
+- [MyTransactions](/frontend/mytransactions) - User's trade history
+
+## 📚 Related Documentation
+
+- [ApexCharts Documentation](https://apexcharts.com/docs/)
+- [State Management](/state-management) - Price chart selectors
+- [Styling Guide](/frontend/styling) - Chart theming
+
+---
+
+**Next:** Learn about the [Trades Component](/frontend/trades) →

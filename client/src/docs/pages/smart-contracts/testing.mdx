@@ -1,0 +1,916 @@
+# Testing Guide
+
+Comprehensive guide to testing smart contracts in Dapp-Forge using Truffle, Mocha, and Chai.
+
+## 🧪 Testing Overview
+
+### Why Test Smart Contracts?
+
+Smart contracts are **immutable** and handle **real money**. Testing is critical because:
+
+- ✅ **Bugs are expensive** - Can't patch after deployment
+- ✅ **Funds at risk** - Exploits can drain all assets
+- ✅ **Reputation matters** - Failed contracts destroy trust
+- ✅ **No rollbacks** - Blockchain is permanent
+- ✅ **Gas costs** - Inefficient code wastes money
+
+### Testing Philosophy
+
+**Test-Driven Development (TDD):**
+1. Write test first (red)
+2. Write minimal code to pass (green)
+3. Refactor and improve (refactor)
+4. Repeat
+
+**Coverage Goals:**
+- ✅ **100% line coverage** minimum
+- ✅ **100% branch coverage** ideal
+- ✅ **Edge cases** covered
+- ✅ **Failure cases** tested
+- ✅ **Integration paths** validated
+
+## 🛠️ Testing Stack
+
+### Tools Used
+
+**Truffle Framework:**
+- Contract compilation
+- Deployment scripts
+- Test runner
+- Network management
+
+**Mocha:**
+- Test framework
+- Describe/it syntax
+- Hooks (before, after)
+
+**Chai:**
+- Assertion library
+- Should/expect syntax
+- Plugin extensions
+
+**Ganache:**
+- Local blockchain
+- Fast mining
+- Account management
+- State inspection
+
+### Setup
+
+**Install Dependencies:**
+```bash
+npm install --save-dev truffle
+npm install --save-dev ganache-cli
+npm install --save-dev chai
+npm install --save-dev chai-as-promised
+```
+
+**Project Structure:**
+```
+dapp-forge/
+├── contracts/
+│   ├── Exchange.sol
+│   ├── Token.sol
+│   └── Migrations.sol
+├── migrations/
+│   ├── 1_initial_migration.js
+│   ├── 2_deploy_contracts.js
+├── test/
+│   ├── Exchange.test.js
+│   ├── Token.test.js
+│   └── helpers.js
+├── truffle-config.js
+└── package.json
+```
+
+**truffle-config.js:**
+```javascript
+module.exports = {
+  networks: {
+    development: {
+      host: "127.0.0.1",
+      port: 7545,
+      network_id: "*"
+    }
+  },
+  compilers: {
+    solc: {
+      version: "0.8.0",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
+      }
+    }
+  }
+}
+```
+
+## 📝 Writing Tests
+
+### Test Structure
+
+**Basic Template:**
+```javascript
+const Token = artifacts.require('Token')
+const Exchange = artifacts.require('Exchange')
+
+require('chai')
+  .use(require('chai-as-promised'))
+  .should()
+
+contract('Exchange', ([deployer, feeAccount, user1, user2]) => {
+  let token, exchange
+  const feePercent = 10
+
+  beforeEach(async () => {
+    // Deploy fresh contracts for each test
+    token = await Token.new('Dapp Token', 'DAPP', '1000000')
+    exchange = await Exchange.new(feeAccount, feePercent)
+  })
+
+  describe('deployment', () => {
+    it('tracks the fee account', async () => {
+      const result = await exchange.feeAccount()
+      result.should.equal(feeAccount)
+    })
+
+    it('tracks the fee percent', async () => {
+      const result = await exchange.feePercent()
+      result.toString().should.equal(feePercent.toString())
+    })
+  })
+})
+```
+
+### Helper Functions
+
+**test/helpers.js:**
+```javascript
+// Convert to Wei
+export const ether = (n) => {
+  return web3.utils.toWei(n.toString(), 'ether')
+}
+
+// Convert to smallest token unit
+export const tokens = (n) => ether(n)
+
+// Ethereum address constant
+export const ETHER_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+// Wait for event
+export const wait = (seconds) => {
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1000))
+}
+
+// Format balance
+export const formatBalance = (balance) => {
+  const precision = 100 // 2 decimal places
+  balance = ether(balance)
+  balance = Math.round(balance * precision) / precision
+  return balance
+}
+
+// EVM snapshot (for reverting state)
+export const snapshot = () => {
+  return new Promise((resolve, reject) => {
+    web3.currentProvider.send({
+      jsonrpc: '2.0',
+      method: 'evm_snapshot',
+      id: new Date().getTime()
+    }, (err, result) => {
+      if (err) { return reject(err) }
+      resolve(result.result)
+    })
+  })
+}
+
+export const revert = (snapshotId) => {
+  return new Promise((resolve, reject) => {
+    web3.currentProvider.send({
+      jsonrpc: '2.0',
+      method: 'evm_revert',
+      params: [snapshotId],
+      id: new Date().getTime()
+    }, (err, result) => {
+      if (err) { return reject(err) }
+      resolve(result)
+    })
+  })
+}
+
+// Increase time
+export const increaseTime = (duration) => {
+  return new Promise((resolve, reject) => {
+    web3.currentProvider.send({
+      jsonrpc: '2.0',
+      method: 'evm_increaseTime',
+      params: [duration],
+      id: new Date().getTime()
+    }, (err, result) => {
+      if (err) { return reject(err) }
+      web3.currentProvider.send({
+        jsonrpc: '2.0',
+        method: 'evm_mine',
+        id: new Date().getTime()
+      }, (err2, result2) => {
+        if (err2) { return reject(err2) }
+        resolve(result2)
+      })
+    })
+  })
+}
+```
+
+## 🧩 Unit Testing
+
+### Testing Token Contract
+
+**Token Deployment:**
+```javascript
+describe('Token deployment', () => {
+  it('tracks the name', async () => {
+    const result = await token.name()
+    result.should.equal('Dapp Token')
+  })
+
+  it('tracks the symbol', async () => {
+    const result = await token.symbol()
+    result.should.equal('DAPP')
+  })
+
+  it('tracks the decimals', async () => {
+    const result = await token.decimals()
+    result.toString().should.equal('18')
+  })
+
+  it('tracks the total supply', async () => {
+    const result = await token.totalSupply()
+    result.toString().should.equal(tokens(1000000).toString())
+  })
+
+  it('assigns total supply to deployer', async () => {
+    const result = await token.balanceOf(deployer)
+    result.toString().should.equal(tokens(1000000).toString())
+  })
+})
+```
+
+**Token Transfers:**
+```javascript
+describe('sending tokens', () => {
+  let amount, result
+
+  describe('success', () => {
+    beforeEach(async () => {
+      amount = tokens(100)
+      result = await token.transfer(user1, amount, { from: deployer })
+    })
+
+    it('transfers token balances', async () => {
+      let balance
+      
+      // Check deployer balance decreased
+      balance = await token.balanceOf(deployer)
+      balance.toString().should.equal(tokens(999900).toString())
+      
+      // Check receiver balance increased
+      balance = await token.balanceOf(user1)
+      balance.toString().should.equal(tokens(100).toString())
+    })
+
+    it('emits a Transfer event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Transfer')
+      
+      const event = log.args
+      event.from.should.equal(deployer, 'from is correct')
+      event.to.should.equal(user1, 'to is correct')
+      event.value.toString().should.equal(amount.toString(), 'value is correct')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects insufficient balances', async () => {
+      let invalidAmount = tokens(100000000) // Greater than total supply
+      await token.transfer(user1, invalidAmount, { from: deployer })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects invalid recipients', async () => {
+      await token.transfer(ETHER_ADDRESS, amount, { from: deployer })
+        .should.be.rejected
+    })
+  })
+})
+```
+
+**Token Approvals:**
+```javascript
+describe('approving tokens', () => {
+  let result, amount
+
+  beforeEach(async () => {
+    amount = tokens(100)
+    result = await token.approve(exchange.address, amount, { from: deployer })
+  })
+
+  describe('success', () => {
+    it('allocates an allowance for delegated token spending', async () => {
+      const allowance = await token.allowance(deployer, exchange.address)
+      allowance.toString().should.equal(amount.toString())
+    })
+
+    it('emits an Approval event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Approval')
+      
+      const event = log.args
+      event.owner.should.equal(deployer, 'owner is correct')
+      event.spender.should.equal(exchange.address, 'spender is correct')
+      event.value.toString().should.equal(amount.toString(), 'value is correct')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects invalid spenders', async () => {
+      await token.approve(ETHER_ADDRESS, amount, { from: deployer })
+        .should.be.rejected
+    })
+  })
+})
+```
+
+**TransferFrom:**
+```javascript
+describe('delegated token transfers', () => {
+  let amount, result
+
+  beforeEach(async () => {
+    amount = tokens(100)
+    await token.approve(exchange.address, amount, { from: deployer })
+  })
+
+  describe('success', () => {
+    beforeEach(async () => {
+      result = await token.transferFrom(deployer, user1, amount, 
+        { from: exchange.address })
+    })
+
+    it('transfers token balances', async () => {
+      let balance
+      
+      balance = await token.balanceOf(deployer)
+      balance.toString().should.equal(tokens(999900).toString())
+      
+      balance = await token.balanceOf(user1)
+      balance.toString().should.equal(tokens(100).toString())
+    })
+
+    it('resets the allowance', async () => {
+      const allowance = await token.allowance(deployer, exchange.address)
+      allowance.toString().should.equal('0')
+    })
+
+    it('emits a Transfer event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Transfer')
+      
+      const event = log.args
+      event.from.should.equal(deployer)
+      event.to.should.equal(user1)
+      event.value.toString().should.equal(amount.toString())
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects insufficient amounts', async () => {
+      const invalidAmount = tokens(100000000)
+      await token.transferFrom(deployer, user1, invalidAmount, 
+        { from: exchange.address }).should.be.rejectedWith('revert')
+    })
+
+    it('rejects invalid recipients', async () => {
+      await token.transferFrom(deployer, ETHER_ADDRESS, amount, 
+        { from: exchange.address }).should.be.rejected
+    })
+  })
+})
+```
+
+### Testing Exchange Contract
+
+**Exchange Deployment:**
+```javascript
+describe('Exchange deployment', () => {
+  it('tracks the fee account', async () => {
+    const result = await exchange.feeAccount()
+    result.should.equal(feeAccount)
+  })
+
+  it('tracks the fee percent', async () => {
+    const result = await exchange.feePercent()
+    result.toString().should.equal(feePercent.toString())
+  })
+})
+```
+
+**Depositing Ether:**
+```javascript
+describe('depositing Ether', () => {
+  let result, amount
+
+  beforeEach(async () => {
+    amount = ether(1)
+    result = await exchange.depositEther({ from: user1, value: amount })
+  })
+
+  it('tracks the Ether deposit', async () => {
+    const balance = await exchange.balanceOf(ETHER_ADDRESS, user1)
+    balance.toString().should.equal(amount.toString())
+  })
+
+  it('emits a Deposit event', async () => {
+    const log = result.logs[0]
+    log.event.should.equal('Deposit')
+    
+    const event = log.args
+    event.token.should.equal(ETHER_ADDRESS, 'token address is correct')
+    event.user.should.equal(user1, 'user address is correct')
+    event.amount.toString().should.equal(amount.toString(), 'amount is correct')
+    event.balance.toString().should.equal(amount.toString(), 'balance is correct')
+  })
+})
+```
+
+**Withdrawing Ether:**
+```javascript
+describe('withdrawing Ether', () => {
+  let result, amount
+
+  beforeEach(async () => {
+    amount = ether(1)
+    await exchange.depositEther({ from: user1, value: amount })
+  })
+
+  describe('success', () => {
+    beforeEach(async () => {
+      result = await exchange.withdrawEther(amount, { from: user1 })
+    })
+
+    it('withdraws Ether funds', async () => {
+      const balance = await exchange.balanceOf(ETHER_ADDRESS, user1)
+      balance.toString().should.equal('0')
+    })
+
+    it('emits a Withdraw event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Withdraw')
+      
+      const event = log.args
+      event.token.should.equal(ETHER_ADDRESS)
+      event.user.should.equal(user1)
+      event.amount.toString().should.equal(amount.toString())
+      event.balance.toString().should.equal('0')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects withdraws for insufficient balances', async () => {
+      await exchange.withdrawEther(ether(100), { from: user1 })
+        .should.be.rejectedWith('revert')
+    })
+  })
+})
+```
+
+**Depositing Tokens:**
+```javascript
+describe('depositing tokens', () => {
+  let result, amount
+
+  describe('success', () => {
+    beforeEach(async () => {
+      amount = tokens(10)
+      await token.approve(exchange.address, amount, { from: user1 })
+      result = await exchange.depositToken(token.address, amount, 
+        { from: user1 })
+    })
+
+    it('tracks the token deposit', async () => {
+      let balance
+      
+      // Check exchange balance
+      balance = await token.balanceOf(exchange.address)
+      balance.toString().should.equal(amount.toString())
+      
+      // Check tokens on exchange
+      balance = await exchange.balanceOf(token.address, user1)
+      balance.toString().should.equal(amount.toString())
+    })
+
+    it('emits a Deposit event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Deposit')
+      
+      const event = log.args
+      event.token.should.equal(token.address)
+      event.user.should.equal(user1)
+      event.amount.toString().should.equal(amount.toString())
+      event.balance.toString().should.equal(amount.toString())
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects Ether deposits', async () => {
+      await exchange.depositToken(ETHER_ADDRESS, tokens(10), { from: user1 })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('fails when no tokens are approved', async () => {
+      await exchange.depositToken(token.address, tokens(10), { from: user1 })
+        .should.be.rejectedWith('revert')
+    })
+  })
+})
+```
+
+**Making Orders:**
+```javascript
+describe('making orders', () => {
+  let result
+
+  beforeEach(async () => {
+    result = await exchange.makeOrder(
+      token.address,
+      tokens(1),
+      ETHER_ADDRESS,
+      ether(1),
+      { from: user1 }
+    )
+  })
+
+  it('tracks the newly created order', async () => {
+    const orderCount = await exchange.orderCount()
+    orderCount.toString().should.equal('1')
+    
+    const order = await exchange.orders('1')
+    order.id.toString().should.equal('1', 'id is correct')
+    order.user.should.equal(user1, 'user is correct')
+    order.tokenGet.should.equal(token.address, 'tokenGet is correct')
+    order.amountGet.toString().should.equal(tokens(1).toString(), 'amountGet is correct')
+    order.tokenGive.should.equal(ETHER_ADDRESS, 'tokenGive is correct')
+    order.amountGive.toString().should.equal(ether(1).toString(), 'amountGive is correct')
+    order.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+  })
+
+  it('emits an Order event', async () => {
+    const log = result.logs[0]
+    log.event.should.equal('Order')
+    
+    const event = log.args
+    event.id.toString().should.equal('1', 'id is correct')
+    event.user.should.equal(user1, 'user is correct')
+    event.tokenGet.should.equal(token.address, 'tokenGet is correct')
+    event.amountGet.toString().should.equal(tokens(1).toString(), 'amountGet is correct')
+    event.tokenGive.should.equal(ETHER_ADDRESS, 'tokenGive is correct')
+    event.amountGive.toString().should.equal(ether(1).toString(), 'amountGive is correct')
+    event.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+  })
+})
+```
+
+**Filling Orders:**
+```javascript
+describe('filling orders', () => {
+  let result
+
+  beforeEach(async () => {
+    // User1 deposits Ether
+    await exchange.depositEther({ from: user1, value: ether(1) })
+    
+    // User1 makes order to buy tokens with Ether
+    await exchange.makeOrder(token.address, tokens(1), ETHER_ADDRESS, ether(1), 
+      { from: user1 })
+    
+    // User2 deposits tokens
+    await token.transfer(user2, tokens(100), { from: deployer })
+    await token.approve(exchange.address, tokens(2), { from: user2 })
+    await exchange.depositToken(token.address, tokens(2), { from: user2 })
+  })
+
+  describe('success', () => {
+    beforeEach(async () => {
+      // User2 fills order
+      result = await exchange.fillOrder('1', { from: user2 })
+    })
+
+    it('executes the trade & charges fees', async () => {
+      let balance
+      
+      // User1 received tokens
+      balance = await exchange.balanceOf(token.address, user1)
+      balance.toString().should.equal(tokens(1).toString(), 'user1 received tokens')
+      
+      // User2 received Ether
+      balance = await exchange.balanceOf(ETHER_ADDRESS, user2)
+      balance.toString().should.equal(ether(1).toString(), 'user2 received Ether')
+      
+      // User1 Ether deducted
+      balance = await exchange.balanceOf(ETHER_ADDRESS, user1)
+      balance.toString().should.equal('0', 'user1 Ether deducted')
+      
+      // User2 tokens deducted with fee
+      balance = await exchange.balanceOf(token.address, user2)
+      balance.toString().should.equal(tokens(0.9).toString(), 'user2 tokens deducted')
+      
+      // feeAccount received fee
+      balance = await exchange.balanceOf(token.address, feeAccount)
+      balance.toString().should.equal(tokens(0.1).toString(), 'feeAccount received fee')
+    })
+
+    it('updates filled orders', async () => {
+      const orderFilled = await exchange.orderFilled(1)
+      orderFilled.should.equal(true)
+    })
+
+    it('emits a Trade event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Trade')
+      
+      const event = log.args
+      event.id.toString().should.equal('1', 'id is correct')
+      event.user.should.equal(user1, 'user is correct')
+      event.tokenGet.should.equal(token.address, 'tokenGet is correct')
+      event.amountGet.toString().should.equal(tokens(1).toString(), 'amountGet is correct')
+      event.tokenGive.should.equal(ETHER_ADDRESS, 'tokenGive is correct')
+      event.amountGive.toString().should.equal(ether(1).toString(), 'amountGive is correct')
+      event.userFill.should.equal(user2, 'userFill is correct')
+      event.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects invalid order ids', async () => {
+      const invalidOrderId = 99999
+      await exchange.fillOrder(invalidOrderId, { from: user2 })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects already-filled orders', async () => {
+      await exchange.fillOrder('1', { from: user2 }).should.be.fulfilled
+      await exchange.fillOrder('1', { from: user2 })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects cancelled orders', async () => {
+      await exchange.cancelOrder('1', { from: user1 }).should.be.fulfilled
+      await exchange.fillOrder('1', { from: user2 })
+        .should.be.rejectedWith('revert')
+    })
+  })
+})
+```
+
+**Cancelling Orders:**
+```javascript
+describe('cancelling orders', () => {
+  let result
+
+  beforeEach(async () => {
+    await exchange.depositEther({ from: user1, value: ether(1) })
+    await exchange.makeOrder(token.address, tokens(1), ETHER_ADDRESS, ether(1), 
+      { from: user1 })
+  })
+
+  describe('success', () => {
+    beforeEach(async () => {
+      result = await exchange.cancelOrder('1', { from: user1 })
+    })
+
+    it('updates cancelled orders', async () => {
+      const orderCancelled = await exchange.orderCancelled(1)
+      orderCancelled.should.equal(true)
+    })
+
+    it('emits a Cancel event', async () => {
+      const log = result.logs[0]
+      log.event.should.equal('Cancel')
+      
+      const event = log.args
+      event.id.toString().should.equal('1', 'id is correct')
+      event.user.should.equal(user1, 'user is correct')
+      event.tokenGet.should.equal(token.address, 'tokenGet is correct')
+      event.amountGet.toString().should.equal(tokens(1).toString(), 'amountGet is correct')
+      event.tokenGive.should.equal(ETHER_ADDRESS, 'tokenGive is correct')
+      event.amountGive.toString().should.equal(ether(1).toString(), 'amountGive is correct')
+      event.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+    })
+  })
+
+  describe('failure', () => {
+    it('rejects invalid order ids', async () => {
+      const invalidOrderId = 99999
+      await exchange.cancelOrder(invalidOrderId, { from: user1 })
+        .should.be.rejectedWith('revert')
+    })
+
+    it('rejects unauthorized cancellations', async () => {
+      await exchange.cancelOrder('1', { from: user2 })
+        .should.be.rejectedWith('revert')
+    })
+  })
+})
+```
+
+## 🔄 Integration Testing
+
+**Complete Trading Flow:**
+```javascript
+describe('complete trading flow', () => {
+  beforeEach(async () => {
+    // Give tokens to users
+    await token.transfer(user1, tokens(100), { from: deployer })
+    await token.transfer(user2, tokens(100), { from: deployer })
+
+    // User1: Deposit ETH, make buy order
+    await exchange.depositEther({ from: user1, value: ether(2) })
+    await exchange.makeOrder(
+      token.address, tokens(10), ETHER_ADDRESS, ether(1),
+      { from: user1 }
+    )
+
+    // User2: Deposit tokens
+    await token.approve(exchange.address, tokens(20), { from: user2 })
+    await exchange.depositToken(token.address, tokens(20), { from: user2 })
+    
+    // User2: Fill order
+    await exchange.fillOrder('1', { from: user2 })
+  })
+
+  it('completes the full trade successfully', async () => {
+    // Verify final balances
+    let balance
+
+    // User1 has tokens
+    balance = await exchange.balanceOf(token.address, user1)
+    balance.toString().should.equal(tokens(10).toString())
+
+    // User2 has ETH
+    balance = await exchange.balanceOf(ETHER_ADDRESS, user2)
+    balance.toString().should.equal(ether(1).toString())
+
+    // Fee collected
+    balance = await exchange.balanceOf(token.address, feeAccount)
+    balance.toString().should.equal(tokens(1).toString())
+  })
+
+  it('allows withdrawal after trade', async () => {
+    // User1 withdraws tokens
+    await exchange.withdrawToken(token.address, tokens(10), { from: user1 })
+    
+    // Verify wallet balance
+    const balance = await token.balanceOf(user1)
+    balance.toString().should.equal(tokens(10).toString())
+  })
+})
+```
+
+## 📊 Test Coverage
+
+**Generate Coverage Report:**
+```bash
+npm install --save-dev solidity-coverage
+```
+
+**package.json:**
+```json
+{
+  "scripts": {
+    "test": "truffle test",
+    "coverage": "truffle run coverage"
+  }
+}
+```
+
+**Run coverage:**
+```bash
+npm run coverage
+```
+
+**Target Coverage:**
+```
+File              |  % Stmts | % Branch |  % Funcs |  % Lines |
+------------------|----------|----------|----------|----------|
+Exchange.sol      |      100 |      100 |      100 |      100 |
+Token.sol         |      100 |      100 |      100 |      100 |
+------------------|----------|----------|----------|----------|
+All files         |      100 |      100 |      100 |      100 |
+```
+
+## 🎯 Best Practices
+
+### Test Organization
+
+**Group related tests:**
+```javascript
+describe('Exchange', () => {
+  describe('deployment', () => { /* ... */ })
+  describe('depositing Ether', () => { /* ... */ })
+  describe('withdrawing Ether', () => { /* ... */ })
+  describe('making orders', () => { 
+    describe('success', () => { /* ... */ })
+    describe('failure', () => { /* ... */ })
+  })
+})
+```
+
+### Test Independence
+
+**Each test should be independent:**
+```javascript
+// ✅ GOOD: Use beforeEach for setup
+beforeEach(async () => {
+  token = await Token.new()
+  exchange = await Exchange.new()
+})
+
+// ❌ BAD: Tests depending on each other
+it('test 1', () => { /* modifies state */ })
+it('test 2', () => { /* relies on test 1 state */ })
+```
+
+### Descriptive Names
+
+**Use clear, descriptive test names:**
+```javascript
+// ✅ GOOD
+it('tracks the fee account address', async () => {})
+it('rejects withdrawals exceeding balance', async () => {})
+it('emits a Transfer event with correct parameters', async () => {})
+
+// ❌ BAD
+it('works', async () => {})
+it('test 1', async () => {})
+it('fee', async () => {})
+```
+
+### Test Both Success and Failure
+
+```javascript
+describe('transfer', () => {
+  describe('success', () => {
+    it('transfers tokens', async () => { /* ... */ })
+    it('emits event', async () => { /* ... */ })
+  })
+
+  describe('failure', () => {
+    it('rejects insufficient balance', async () => { /* ... */ })
+    it('rejects invalid recipient', async () => { /* ... */ })
+  })
+})
+```
+
+## 🚀 Running Tests
+
+**Run all tests:**
+```bash
+truffle test
+```
+
+**Run specific test file:**
+```bash
+truffle test test/Exchange.test.js
+```
+
+**Run with Ganache:**
+```bash
+# Terminal 1: Start Ganache
+ganache-cli
+
+# Terminal 2: Run tests
+truffle test --network development
+```
+
+**Verbose output:**
+```bash
+truffle test --show-events
+```
+
+**Compile before testing:**
+```bash
+truffle compile
+truffle test
+```
+
+## 🔗 Related Documentation
+
+- [Security Best Practices](/smart-contracts/security)
+- [Exchange Contract](/smart-contracts/exchange)
+- [Token Contract](/smart-contracts/token)
+- [Gas Optimization](/smart-contracts/gas-optimization)
+
+---
+
+**Remember:** Good tests are investments that pay dividends throughout the project lifecycle!

@@ -1,0 +1,679 @@
+# App Component
+
+The root component of Dapp-Forge that initializes the application, loads blockchain data, and manages the overall layout.
+
+## 📋 Overview
+
+**File:** `src/components/App.js`
+
+**Purpose:** 
+- Entry point for the React application
+- Handles Web3 initialization
+- Loads smart contracts
+- Subscribes to blockchain events
+- Manages global layout structure
+
+## 🏗️ Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import './App.css'
+
+// Import child components
+import Navbar from './Navbar'
+import Content from './Content'
+import { loadWeb3, loadAccount, loadToken, loadExchange } from '../store/interactions'
+
+class App extends Component {
+  // Lifecycle methods
+  // Event subscriptions
+  // Render method
+}
+
+function mapStateToProps(state) {
+  return {
+    // Redux state mapping
+  }
+}
+
+export default connect(mapStateToProps)(App)
+```
+
+## 🔄 Lifecycle Flow
+
+### 1. Component Mounting
+
+```javascript
+async componentWillMount() {
+  await this.loadBlockchainData(this.props.dispatch)
+}
+```
+
+**What happens:**
+1. Component is about to mount
+2. Blockchain data loading initiated
+3. Redux store populated with data
+4. Component renders with loaded data
+
+### 2. Blockchain Data Loading
+
+```javascript
+async loadBlockchainData(dispatch) {
+  // 1. Initialize Web3
+  const web3 = await loadWeb3(dispatch)
+  
+  // 2. Load user account
+  const networkId = await web3.eth.net.getId()
+  await loadAccount(web3, dispatch)
+  
+  // 3. Load Token contract
+  const token = await loadToken(web3, networkId, dispatch)
+  if(!token) {
+    window.alert('Token smart contract not detected on the current network')
+    return
+  }
+  
+  // 4. Load Exchange contract
+  const exchange = await loadExchange(web3, networkId, dispatch)
+  if(!exchange) {
+    window.alert('Exchange smart contract not detected on the current network')
+    return
+  }
+}
+```
+
+**Step-by-step breakdown:**
+
+#### Step 1: Initialize Web3
+```javascript
+const web3 = await loadWeb3(dispatch)
+```
+- Detects MetaMask or Web3 provider
+- Creates Web3 instance
+- Dispatches to Redux store
+- Returns Web3 object
+
+#### Step 2: Load Network & Account
+```javascript
+const networkId = await web3.eth.net.getId()
+await loadAccount(web3, dispatch)
+```
+- Gets current network ID (1 = mainnet, 5 = Goerli, etc.)
+- Fetches user's Ethereum account
+- Dispatches account to Redux
+
+#### Step 3: Load Token Contract
+```javascript
+const token = await loadToken(web3, networkId, dispatch)
+if(!token) {
+  window.alert('Token smart contract not detected')
+  return
+}
+```
+- Loads Token.json ABI
+- Gets deployed address for network
+- Creates contract instance
+- Loads token data (name, symbol, etc.)
+
+#### Step 4: Load Exchange Contract
+```javascript
+const exchange = await loadExchange(web3, networkId, dispatch)
+if(!exchange) {
+  window.alert('Exchange smart contract not detected')
+  return
+}
+```
+- Loads Exchange.json ABI
+- Gets deployed address for network
+- Creates contract instance
+- Loads orders and trades
+
+## 📡 Event Subscriptions
+
+After loading blockchain data, the app subscribes to smart contract events for real-time updates.
+
+### Event Listener Setup
+
+```javascript
+subscribeToEvents(exchange, dispatch) {
+  // Listen for Cancel events
+  exchange.events.Cancel({}, (error, event) => {
+    if (error) {
+      console.error('Error in Cancel event:', error)
+      return
+    }
+    console.log('Order cancelled:', event)
+    dispatch(orderCancelled(event))
+  })
+
+  // Listen for Trade events
+  exchange.events.Trade({}, (error, event) => {
+    if (error) {
+      console.error('Error in Trade event:', error)
+      return
+    }
+    console.log('Trade executed:', event)
+    dispatch(orderFilled(event))
+  })
+
+  // Listen for Deposit events
+  exchange.events.Deposit({}, (error, event) => {
+    if (error) {
+      console.error('Error in Deposit event:', error)
+      return
+    }
+    console.log('Deposit made:', event)
+    dispatch(balancesLoaded(event))
+  })
+
+  // Listen for Withdraw events
+  exchange.events.Withdraw({}, (error, event) => {
+    if (error) {
+      console.error('Error in Withdraw event:', error)
+      return
+    }
+    console.log('Withdrawal made:', event)
+    dispatch(balancesLoaded(event))
+  })
+
+  // Listen for Order events
+  exchange.events.Order({}, (error, event) => {
+    if (error) {
+      console.error('Error in Order event:', error)
+      return
+    }
+    console.log('Order created:', event)
+    dispatch(orderMade(event))
+  })
+}
+```
+
+### Event Flow Diagram
+
+```
+Smart Contract Event
+       ↓
+Event Listener (in App component)
+       ↓
+Redux Action Dispatched
+       ↓
+Reducer Updates State
+       ↓
+Connected Components Re-render
+```
+
+## 🎨 Render Method
+
+```javascript
+render() {
+  return (
+    <div>
+      <Navbar />
+      <Content />
+    </div>
+  )
+}
+```
+
+### Layout Structure
+
+```
+┌─────────────────────────────────────────┐
+│            Navbar                       │
+├─────────────────────────────────────────┤
+│                                         │
+│            Content                      │
+│                                         │
+│  ┌────────┐ ┌──────────┐ ┌──────────┐ │
+│  │Balance │ │OrderBook │ │PriceChart│ │
+│  ├────────┤ ├──────────┤ ├──────────┤ │
+│  │NewOrder│ │          │ │  Trades  │ │
+│  └────────┘ └──────────┘ └──────────┘ │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+## 🔗 Redux Connection
+
+### State Mapping
+
+```javascript
+function mapStateToProps(state) {
+  return {
+    account: accountSelector(state),
+    contracts: contractsLoadedSelector(state),
+    // ... other selectors
+  }
+}
+```
+
+**Available Props from Redux:**
+- `account`: User's Ethereum address
+- `contracts`: Boolean indicating if contracts loaded
+- `web3`: Web3 instance
+- `token`: Token contract instance
+- `exchange`: Exchange contract instance
+
+### Conditional Rendering Based on State
+
+```javascript
+render() {
+  return (
+    <div>
+      <Navbar />
+      {this.props.contracts ? (
+        <Content />
+      ) : (
+        <div className="content">
+          <div className="vertical-center">
+            <Spinner />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+## 🛠️ Key Functions
+
+### loadWeb3()
+
+**Purpose:** Initialize Web3 connection
+
+```javascript
+export const loadWeb3 = async (dispatch) => {
+  if (typeof window.ethereum !== 'undefined') {
+    // Modern dapp browsers
+    const web3 = new Web3(window.ethereum)
+    try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' })
+    } catch (error) {
+      console.error('User denied account access')
+    }
+    dispatch(web3Loaded(web3))
+    return web3
+  } else if (window.web3) {
+    // Legacy dapp browsers
+    const web3 = new Web3(window.web3.currentProvider)
+    dispatch(web3Loaded(web3))
+    return web3
+  } else {
+    window.alert('Non-Ethereum browser detected. Install MetaMask!')
+  }
+}
+```
+
+**Flow:**
+1. Check for Ethereum provider (MetaMask)
+2. Request account access
+3. Create Web3 instance
+4. Dispatch to Redux
+5. Return Web3 object
+
+### loadAccount()
+
+**Purpose:** Load user's Ethereum account
+
+```javascript
+export const loadAccount = async (web3, dispatch) => {
+  const accounts = await web3.eth.getAccounts()
+  const account = accounts[0]
+  dispatch(web3AccountLoaded(account))
+  return account
+}
+```
+
+**What it does:**
+- Gets all accounts from Web3
+- Selects first account
+- Dispatches to Redux
+- Returns account address
+
+### loadToken()
+
+**Purpose:** Load Token smart contract
+
+```javascript
+export const loadToken = async (web3, networkId, dispatch) => {
+  try {
+    const token = new web3.eth.Contract(
+      Token.abi,
+      Token.networks[networkId].address
+    )
+    dispatch(tokenLoaded(token))
+    return token
+  } catch (error) {
+    console.log('Token contract not deployed to the current network')
+    return null
+  }
+}
+```
+
+**Steps:**
+1. Get Token ABI from compiled artifact
+2. Get deployed address for current network
+3. Create contract instance
+4. Dispatch to Redux
+5. Return contract or null if not found
+
+### loadExchange()
+
+**Purpose:** Load Exchange smart contract
+
+```javascript
+export const loadExchange = async (web3, networkId, dispatch) => {
+  try {
+    const exchange = new web3.eth.Contract(
+      Exchange.abi,
+      Exchange.networks[networkId].address
+    )
+    dispatch(exchangeLoaded(exchange))
+    return exchange
+  } catch (error) {
+    console.log('Exchange contract not deployed to the current network')
+    return null
+  }
+}
+```
+
+Similar to loadToken() but for Exchange contract.
+
+## 🎯 Error Handling
+
+### Network Detection
+
+```javascript
+if(!token) {
+  window.alert('Token smart contract not detected on the current network. ' +
+               'Please select another network with MetaMask.')
+  return
+}
+```
+
+### MetaMask Not Installed
+
+```javascript
+if (typeof window.ethereum === 'undefined') {
+  window.alert('Non-Ethereum browser detected. Install MetaMask!')
+  return
+}
+```
+
+### User Rejects Connection
+
+```javascript
+try {
+  await window.ethereum.request({ method: 'eth_requestAccounts' })
+} catch (error) {
+  console.error('User denied account access')
+  // Show user-friendly message
+}
+```
+
+### Event Listener Errors
+
+```javascript
+exchange.events.Trade({}, (error, event) => {
+  if (error) {
+    console.error('Error in Trade event:', error)
+    // Handle error gracefully
+    return
+  }
+  // Process event
+})
+```
+
+## 📱 Responsive Considerations
+
+### Mobile Layout
+
+```css
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+  }
+  
+  .vertical-split {
+    width: 100% !important;
+  }
+}
+```
+
+### Loading State
+
+```javascript
+{this.props.contracts ? (
+  <Content />
+) : (
+  <div className="spinner-border text-light" role="status">
+    <span className="visually-hidden">Loading...</span>
+  </div>
+)}
+```
+
+## 🔄 Account Change Handling
+
+### Listen for Account Changes
+
+```javascript
+componentDidMount() {
+  if (window.ethereum) {
+    window.ethereum.on('accountsChanged', (accounts) => {
+      this.handleAccountChange(accounts[0])
+    })
+  }
+}
+
+handleAccountChange = async (newAccount) => {
+  const { dispatch, web3 } = this.props
+  dispatch(web3AccountLoaded(newAccount))
+  
+  // Reload balances and orders for new account
+  await this.loadAccountData()
+}
+```
+
+### Listen for Network Changes
+
+```javascript
+componentDidMount() {
+  if (window.ethereum) {
+    window.ethereum.on('chainChanged', (chainId) => {
+      // Reload the page to reset state
+      window.location.reload()
+    })
+  }
+}
+```
+
+## 🧪 Testing
+
+### Unit Test Example
+
+```javascript
+import { render, screen } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import App from './App'
+import configureStore from '../store/configureStore'
+
+describe('App Component', () => {
+  let store
+
+  beforeEach(() => {
+    store = configureStore()
+  })
+
+  it('renders without crashing', () => {
+    render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+  })
+
+  it('displays navbar', () => {
+    render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+    expect(screen.getByText(/Dapp-Forge/i)).toBeInTheDocument()
+  })
+
+  it('shows loading spinner when contracts not loaded', () => {
+    render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+    expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+})
+```
+
+## 🎯 Best Practices
+
+### 1. Async/Await for Loading
+
+```javascript
+// ✅ GOOD: Sequential loading with error handling
+async loadBlockchainData() {
+  try {
+    const web3 = await loadWeb3(dispatch)
+    const account = await loadAccount(web3, dispatch)
+    const token = await loadToken(web3, networkId, dispatch)
+    const exchange = await loadExchange(web3, networkId, dispatch)
+  } catch (error) {
+    console.error('Failed to load blockchain data:', error)
+  }
+}
+```
+
+### 2. Cleanup Event Listeners
+
+```javascript
+componentWillUnmount() {
+  // Unsubscribe from events
+  if (this.tradeSubscription) {
+    this.tradeSubscription.unsubscribe()
+  }
+  if (this.orderSubscription) {
+    this.orderSubscription.unsubscribe()
+  }
+}
+```
+
+### 3. Loading States
+
+```javascript
+// Show different states clearly
+{!this.props.web3 && <p>Connecting to Web3...</p>}
+{!this.props.contracts && <p>Loading contracts...</p>}
+{this.props.contracts && <Content />}
+```
+
+## 🐛 Common Issues
+
+### Issue 1: MetaMask Not Detected
+
+**Problem:** App doesn't load because MetaMask not installed
+
+**Solution:**
+```javascript
+if (typeof window.ethereum === 'undefined') {
+  return (
+    <div className="alert alert-warning">
+      Please install <a href="https://metamask.io">MetaMask</a> to use this app.
+    </div>
+  )
+}
+```
+
+### Issue 2: Wrong Network
+
+**Problem:** Contracts not deployed on current network
+
+**Solution:**
+```javascript
+if (!token || !exchange) {
+  return (
+    <div className="alert alert-danger">
+      Contracts not deployed on this network.
+      Please switch to Sepolia testnet.
+    </div>
+  )
+}
+```
+
+### Issue 3: Account Not Connected
+
+**Problem:** User hasn't connected MetaMask
+
+**Solution:**
+```javascript
+if (!this.props.account) {
+  return (
+    <button onClick={this.connectWallet}>
+      Connect Wallet
+    </button>
+  )
+}
+```
+
+## 📊 Performance Tips
+
+### 1. Memoize Selectors
+
+```javascript
+import { createSelector } from 'reselect'
+
+const getAccount = state => state.web3.account
+const getContracts = state => state.contracts
+
+const contractsLoadedSelector = createSelector(
+  [getAccount, getContracts],
+  (account, contracts) => {
+    return account && contracts
+  }
+)
+```
+
+### 2. Lazy Load Components
+
+```javascript
+const Content = React.lazy(() => import('./Content'))
+
+<Suspense fallback={<Spinner />}>
+  <Content />
+</Suspense>
+```
+
+### 3. Debounce Event Handlers
+
+```javascript
+import { debounce } from 'lodash'
+
+handleAccountChange = debounce((account) => {
+  this.loadAccountData(account)
+}, 300)
+```
+
+## 🔗 Related Components
+
+- [Navbar](/frontend/navbar) - Top navigation
+- [Content](/frontend/content) - Main content wrapper
+- [Balance](/frontend/balance) - Balance management
+- [OrderBook](/frontend/orderbook) - Order display
+
+## 📚 Related Documentation
+
+- [State Management](/state-management) - Redux architecture
+- [Smart Contracts](/smart-contracts) - Backend contracts
+- [API Reference](/api-reference) - Interaction functions
+- [Getting Started](/getting-started) - Setup guide
+
+---
+
+**Next:** Learn about the [Navbar Component](/frontend/navbar) →

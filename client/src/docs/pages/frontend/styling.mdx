@@ -1,0 +1,766 @@
+# Styling Guide
+
+Complete guide to styling Dapp-Forge components using Bootstrap 5 and custom CSS.
+
+## 🎨 Design System
+
+### Color Palette
+
+```css
+:root {
+  /* Primary Colors */
+  --primary: #0d6efd;
+  --secondary: #6c757d;
+  --success: #25CE8F;
+  --danger: #F45353;
+  --warning: #ffc107;
+  --info: #0dcaf0;
+  
+  /* Background Colors */
+  --bg-dark: #1a1d24;
+  --bg-darker: #12141a;
+  --card-bg: #1e2229;
+  
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: #767F92;
+  --text-muted: #6c757d;
+  
+  /* Border Colors */
+  --border-color: #2c3e50;
+  --border-light: #495057;
+}
+```
+
+### Typography
+
+```css
+/* Font Stack */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 
+               'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+               'Fira Sans', 'Droid Sans', 'Helvetica Neue', 
+               sans-serif;
+}
+
+/* Monospace for numbers */
+.monospace {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Heading Sizes */
+h1 { font-size: 2.5rem; font-weight: 700; }
+h2 { font-size: 2rem; font-weight: 600; }
+h3 { font-size: 1.75rem; font-weight: 600; }
+h4 { font-size: 1.5rem; font-weight: 500; }
+h5 { font-size: 1.25rem; font-weight: 500; }
+h6 { font-size: 1rem; font-weight: 500; }
+```
+
+## 📦 Component Styling
+
+### Card Components
+
+```css
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.card-header {
+  background-color: var(--bg-darker);
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.card-body {
+  padding: 1rem;
+}
+```
+
+### Tables
+
+```css
+.table-dark {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.075);
+  border-color: var(--border-color);
+}
+
+.table-dark thead {
+  border-bottom: 2px solid var(--border-color);
+}
+
+.table-dark tbody tr {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Clickable rows */
+.table tr.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.table tr.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+```
+
+### Forms
+
+```css
+.form-control {
+  background-color: var(--bg-darker);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.form-control:focus {
+  background-color: var(--bg-darker);
+  border-color: var(--primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-control::placeholder {
+  color: var(--text-secondary);
+}
+
+.form-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+```
+
+### Buttons
+
+```css
+/* Primary button */
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+}
+
+/* Success/Danger for buy/sell */
+.btn-success {
+  background-color: var(--success);
+  border-color: var(--success);
+}
+
+.btn-danger {
+  background-color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Button sizes */
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+}
+```
+
+## 🎯 Utility Classes
+
+### Spacing
+
+```css
+/* Margins */
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.mb-5 { margin-bottom: 3rem; }
+
+/* Padding */
+.p-1 { padding: 0.25rem; }
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 1rem; }
+.p-4 { padding: 1.5rem; }
+.p-5 { padding: 3rem; }
+```
+
+### Text Alignment
+
+```css
+.text-start { text-align: left; }
+.text-center { text-align: center; }
+.text-end { text-align: right; }
+```
+
+### Display
+
+```css
+.d-none { display: none; }
+.d-block { display: block; }
+.d-flex { display: flex; }
+.d-grid { display: grid; }
+```
+
+## 📱 Responsive Design
+
+### Breakpoints
+
+```css
+/* Mobile first approach */
+/* Small devices (landscape phones, 576px and up) */
+@media (min-width: 576px) { }
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) { }
+
+/* Large devices (desktops, 992px and up) */
+@media (min-width: 992px) { }
+
+/* Extra large devices (large desktops, 1200px and up) */
+@media (min-width: 1200px) { }
+```
+
+### Mobile Optimization
+
+```css
+@media (max-width: 768px) {
+  /* Stack components vertically */
+  .vertical-split {
+    flex-direction: column;
+  }
+  
+  /* Full width cards */
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  /* Smaller text */
+  .table-sm {
+    font-size: 0.75rem;
+  }
+  
+  /* Hide non-essential columns */
+  .hide-mobile {
+    display: none;
+  }
+}
+```
+
+## 🎨 Theme Customization
+
+### Dark Theme (Default)
+
+```css
+body[data-theme="dark"] {
+  background-color: #12141a;
+  color: #ffffff;
+}
+
+body[data-theme="dark"] .card {
+  background-color: #1e2229;
+  border-color: #2c3e50;
+}
+```
+
+### Light Theme
+
+```css
+body[data-theme="light"] {
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+body[data-theme="light"] .card {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+}
+
+body[data-theme="light"] .table-dark {
+  --bs-table-bg: #ffffff;
+  --bs-table-color: #212529;
+}
+```
+
+## 🎯 Component-Specific Styles
+
+### Order Book
+
+```css
+.order-book {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.order-book-order {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.order-buy:hover {
+  background-color: rgba(37, 206, 143, 0.1);
+}
+
+.order-sell:hover {
+  background-color: rgba(244, 83, 83, 0.1);
+}
+```
+
+### Price Chart
+
+```css
+.price-chart {
+  height: 350px;
+  position: relative;
+}
+
+.price-stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+```
+
+### Balance
+
+```css
+.balance-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.balance-amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+```
+
+---
+
+# Best Practices
+
+Frontend development best practices for Dapp-Forge.
+
+## 🎯 Component Design
+
+### 1. Single Responsibility
+
+```javascript
+// ✅ GOOD: Component does one thing
+class OrderBook extends Component {
+  render() {
+    return <OrderList orders={this.props.orders} />
+  }
+}
+
+// ❌ BAD: Component does too much
+class OrderBook extends Component {
+  render() {
+    return (
+      <div>
+        <OrderList />
+        <PriceChart />
+        <Trades />
+      </div>
+    )
+  }
+}
+```
+
+### 2. Props vs State
+
+```javascript
+// ✅ GOOD: Use props for parent data
+class Component extends Component {
+  render() {
+    return <div>{this.props.data}</div>
+  }
+}
+
+// ✅ GOOD: Use state for local UI
+class Component extends Component {
+  state = { isOpen: false }
+  
+  render() {
+    return <Modal open={this.state.isOpen} />
+  }
+}
+```
+
+### 3. Controlled Components
+
+```javascript
+// ✅ GOOD: Controlled input
+<input
+  value={this.state.value}
+  onChange={(e) => this.setState({ value: e.target.value })}
+/>
+
+// ❌ BAD: Uncontrolled
+<input ref={this.inputRef} />
+```
+
+## 🔄 State Management
+
+### 1. Redux Patterns
+
+```javascript
+// ✅ GOOD: Descriptive action types
+const LOAD_ORDERS_SUCCESS = 'LOAD_ORDERS_SUCCESS'
+
+// ✅ GOOD: Action creators
+const loadOrdersSuccess = (orders) => ({
+  type: LOAD_ORDERS_SUCCESS,
+  orders
+})
+
+// ✅ GOOD: Pure reducers
+const reducer = (state = initialState, action) => {
+  switch(action.type) {
+    case LOAD_ORDERS_SUCCESS:
+      return { ...state, orders: action.orders }
+    default:
+      return state
+  }
+}
+```
+
+### 2. Selectors
+
+```javascript
+// ✅ GOOD: Use createSelector for memoization
+import { createSelector } from 'reselect'
+
+const getOrders = state => state.orders
+const getFilters = state => state.filters
+
+const getFilteredOrders = createSelector(
+  [getOrders, getFilters],
+  (orders, filters) => {
+    return orders.filter(order => 
+      order.price >= filters.minPrice
+    )
+  }
+)
+```
+
+### 3. Avoid Deep Nesting
+
+```javascript
+// ✅ GOOD: Flat state structure
+{
+  orders: { ... },
+  trades: { ... },
+  account: { ... }
+}
+
+// ❌ BAD: Deeply nested
+{
+  exchange: {
+    orders: {
+      data: {
+        items: [ ... ]
+      }
+    }
+  }
+}
+```
+
+## ⚡ Performance
+
+### 1. Memoization
+
+```javascript
+import { memo } from 'react'
+
+// ✅ GOOD: Memoize expensive components
+const OrderRow = memo(({ order }) => (
+  <tr>
+    <td>{order.price}</td>
+    <td>{order.amount}</td>
+  </tr>
+))
+```
+
+### 2. Avoid Inline Functions
+
+```javascript
+// ✅ GOOD: Bind in constructor
+constructor() {
+  this.handleClick = this.handleClick.bind(this)
+}
+
+render() {
+  return <button onClick={this.handleClick}>Click</button>
+}
+
+// ❌ BAD: Creates new function on every render
+render() {
+  return <button onClick={() => this.handleClick()}>Click</button>
+}
+```
+
+### 3. Virtual Scrolling
+
+```javascript
+// For large lists
+import { FixedSizeList } from 'react-window'
+
+<FixedSizeList
+  height={400}
+  itemCount={1000}
+  itemSize={35}
+>
+  {Row}
+</FixedSizeList>
+```
+
+## 🔒 Security
+
+### 1. XSS Prevention
+
+```javascript
+// ✅ GOOD: React escapes by default
+<div>{userInput}</div>
+
+// ⚠️ DANGEROUS: Only if you trust the source
+<div dangerouslySetInnerHTML={{__html: trustedHTML}} />
+```
+
+### 2. Input Validation
+
+```javascript
+// ✅ GOOD: Validate inputs
+const validateAmount = (amount) => {
+  if (!amount || isNaN(amount)) return false
+  if (parseFloat(amount) <= 0) return false
+  if (parseFloat(amount) > MAX_AMOUNT) return false
+  return true
+}
+```
+
+### 3. Safe External Links
+
+```javascript
+// ✅ GOOD: Prevent tab-nabbing
+<a 
+  href={url} 
+  target="_blank" 
+  rel="noopener noreferrer"
+>
+  Link
+</a>
+```
+
+## 🧪 Testing
+
+### 1. Component Tests
+
+```javascript
+import { render, screen, fireEvent } from '@testing-library/react'
+
+test('button click increments counter', () => {
+  render(<Counter />)
+  const button = screen.getByText('Increment')
+  fireEvent.click(button)
+  expect(screen.getByText('Count: 1')).toBeInTheDocument()
+})
+```
+
+### 2. Integration Tests
+
+```javascript
+test('complete order flow', async () => {
+  render(<App />)
+  
+  // Fill order form
+  const amountInput = screen.getByPlaceholderText('Amount')
+  fireEvent.change(amountInput, { target: { value: '10' } })
+  
+  // Submit order
+  const submitButton = screen.getByText('Create Order')
+  fireEvent.click(submitButton)
+  
+  // Verify order appears
+  await screen.findByText('Order #1')
+})
+```
+
+### 3. Mock Redux
+
+```javascript
+import { Provider } from 'react-redux'
+import configureStore from 'redux-mock-store'
+
+const mockStore = configureStore([])
+const store = mockStore({
+  orders: { data: [] }
+})
+
+render(
+  <Provider store={store}>
+    <Component />
+  </Provider>
+)
+```
+
+## 📝 Code Style
+
+### 1. Naming Conventions
+
+```javascript
+// Components: PascalCase
+class OrderBook extends Component {}
+
+// Functions: camelCase
+const fetchOrders = () => {}
+
+// Constants: UPPER_SNAKE_CASE
+const MAX_ORDER_SIZE = 1000
+
+// Private: prefix with _
+const _privateMethod = () => {}
+```
+
+### 2. File Organization
+
+```
+src/
+├── components/
+│   ├── App.js
+│   ├── Navbar.js
+│   └── OrderBook.js
+├── store/
+│   ├── actions.js
+│   ├── reducers.js
+│   └── selectors.js
+├── utils/
+│   ├── helpers.js
+│   └── constants.js
+└── styles/
+    └── App.css
+```
+
+### 3. Import Order
+
+```javascript
+// 1. External libraries
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+
+// 2. Internal modules
+import { loadOrders } from '../store/interactions'
+import { ordersSelector } from '../store/selectors'
+
+// 3. Components
+import OrderBook from './OrderBook'
+import Spinner from './Spinner'
+
+// 4. Styles
+import './App.css'
+```
+
+## 🚀 Deployment
+
+### 1. Build Optimization
+
+```javascript
+// package.json
+{
+  "scripts": {
+    "build": "react-scripts build",
+    "analyze": "source-map-explorer 'build/static/js/*.js'"
+  }
+}
+```
+
+### 2. Environment Variables
+
+```javascript
+// .env.production
+REACT_APP_NETWORK_ID=1
+REACT_APP_INFURA_KEY=your_key_here
+```
+
+### 3. Error Boundaries
+
+```javascript
+class ErrorBoundary extends Component {
+  state = { hasError: false }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <h1>Something went wrong.</h1>
+    }
+    return this.props.children
+  }
+}
+```
+
+## 📚 Documentation
+
+### 1. PropTypes
+
+```javascript
+import PropTypes from 'prop-types'
+
+Component.propTypes = {
+  orders: PropTypes.array.isRequired,
+  onOrderClick: PropTypes.func,
+  loading: PropTypes.bool
+}
+```
+
+### 2. JSDoc Comments
+
+```javascript
+/**
+ * Filters orders by price range
+ * @param {Array} orders - List of orders
+ * @param {number} minPrice - Minimum price
+ * @param {number} maxPrice - Maximum price
+ * @returns {Array} Filtered orders
+ */
+const filterOrders = (orders, minPrice, maxPrice) => {
+  return orders.filter(o => 
+    o.price >= minPrice && o.price <= maxPrice
+  )
+}
+```
+
+### 3. README
+
+```markdown
+# Component Name
+
+## Props
+- `prop1` (required): Description
+- `prop2` (optional): Description
+
+## Usage
+\`\`\`javascript
+<Component prop1="value" />
+\`\`\`
+
+## Notes
+- Important consideration 1
+- Important consideration 2
+```

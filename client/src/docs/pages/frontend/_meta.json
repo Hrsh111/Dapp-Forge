@@ -1,3 +1,13 @@
 {
-  "index": "Overview"
+  "index": "Overview",
+  "app": "App Component",
+  "navbar": "Navbar Component",
+  "balance": "Balance Component",
+  "orderbook": "OrderBook Component",
+  "pricechart": "PriceChart Component",
+  "trades": "Trades Component",
+  "mytransactions": "MyTransactions Component",
+  "neworder": "NewOrder Component",
+  "styling": "Styling Guide",
+  "best-practices": "Best Practices"
 }

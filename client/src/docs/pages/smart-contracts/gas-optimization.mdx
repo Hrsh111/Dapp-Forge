@@ -1,0 +1,683 @@
+# Gas Optimization
+
+Complete guide to optimizing gas costs in Dapp-Forge smart contracts.
+
+## ⛽ Understanding Gas
+
+### What is Gas?
+
+**Gas** is the fee required to execute operations on Ethereum. Every operation costs gas:
+
+```
+Transaction Cost = Gas Used × Gas Price
+```
+
+**Example:**
+```
+Gas Used: 50,000
+Gas Price: 50 gwei
+Total Cost: 50,000 × 50 = 2,500,000 gwei = 0.0025 ETH
+```
+
+At $2,000/ETH: **$5 per transaction**
+
+### Why Optimize Gas?
+
+- ✅ **Lower user costs** - More affordable to use your DApp
+- ✅ **Higher adoption** - Users prefer cheaper transactions
+- ✅ **More transactions** - Fit more in each block
+- ✅ **Better UX** - Faster confirmations at lower prices
+- ✅ **Competitive advantage** - Beat competitors on costs
+
+### Gas Costs by Operation
+
+**Storage Operations (Most Expensive):**
+```solidity
+SSTORE (set):    20,000 gas  // Write to storage
+SSTORE (modify):  5,000 gas  // Modify existing storage
+SLOAD:              200 gas  // Read from storage
+```
+
+**Memory Operations (Cheap):**
+```solidity
+MSTORE:       3 gas  // Write to memory
+MLOAD:        3 gas  // Read from memory
+```
+
+**Computational Operations:**
+```solidity
+ADD:          3 gas
+MUL:          5 gas
+DIV:          5 gas
+SHA3:        30 gas + 6 gas per word
+CALL:     2,600 gas + value transfer cost
+```
+
+## 🎯 Optimization Strategies
+
+### 1. Minimize Storage Operations
+
+**❌ Expensive: Multiple storage writes**
+```solidity
+function updateUser(address _user, uint256 _balance, uint256 _timestamp) public {
+    userBalances[_user] = _balance;     // SSTORE: 20,000 gas
+    userTimestamps[_user] = _timestamp; // SSTORE: 20,000 gas
+    userActive[_user] = true;           // SSTORE: 20,000 gas
+}
+// Total: ~60,000 gas
+```
+
+**✅ Optimized: Pack into struct**
+```solidity
+struct User {
+    uint128 balance;    // 16 bytes
+    uint64 timestamp;   // 8 bytes
+    bool active;        // 1 byte
+}
+mapping(address => User) public users;
+
+function updateUser(address _user, uint128 _balance, uint64 _timestamp) public {
+    users[_user] = User(_balance, _timestamp, true); // SSTORE: 20,000 gas
+}
+// Total: ~20,000 gas (66% savings!)
+```
+
+### 2. Variable Packing
+
+**Understanding Storage Slots:**
+- Each storage slot is 32 bytes (256 bits)
+- Variables packed together save gas
+- Order matters!
+
+**❌ Wasteful: 3 slots used**
+```solidity
+uint256 a;      // Slot 0 (32 bytes)
+uint128 b;      // Slot 1 (16 bytes) - wastes 16 bytes
+uint128 c;      // Slot 2 (16 bytes) - wastes 16 bytes
+// 3 SSTORE operations
+```
+
+**✅ Optimized: 2 slots used**
+```solidity
+uint128 b;      // Slot 0 (16 bytes)
+uint128 c;      // Slot 0 (16 bytes) - fits in same slot!
+uint256 a;      // Slot 1 (32 bytes)
+// 2 SSTORE operations (33% savings)
+```
+
+**Real Example from Exchange:**
+```solidity
+// ✅ Optimized struct packing
+struct _Order {
+    uint256 id;              // Slot 0
+    address user;            // Slot 1 (20 bytes)
+    address tokenGet;        // Slot 2 (20 bytes)
+    uint256 amountGet;       // Slot 3
+    address tokenGive;       // Slot 4 (20 bytes)
+    uint256 amountGive;      // Slot 5
+    uint256 timestamp;       // Slot 6
+}
+// Could be optimized further by using uint128 for amounts
+```
+
+**Further optimization:**
+```solidity
+// ✅ Better packing
+struct _Order {
+    uint128 id;              // Slot 0 (16 bytes)
+    uint64 timestamp;        // Slot 0 (8 bytes) - fits!
+    uint64 reserved;         // Slot 0 (8 bytes) - future use
+    address user;            // Slot 1 (20 bytes)
+    uint96 amountGet;        // Slot 1 (12 bytes) - fits!
+    address tokenGet;        // Slot 2 (20 bytes)
+    uint96 amountGive;       // Slot 2 (12 bytes) - fits!
+    address tokenGive;       // Slot 3 (20 bytes)
+}
+// Reduced from 7 slots to 4 slots (43% savings!)
+```
+
+### 3. Use Memory for Temporary Data
+
+**❌ Expensive: Storage for temporary data**
+```solidity
+uint256 public tempResult;  // Storage
+
+function calculate(uint256 a, uint256 b) public {
+    tempResult = a + b;           // SSTORE: 20,000 gas
+    tempResult = tempResult * 2;  // SSTORE: 5,000 gas
+    return tempResult;
+}
+```
+
+**✅ Optimized: Memory for temporary data**
+```solidity
+function calculate(uint256 a, uint256 b) public pure returns (uint256) {
+    uint256 tempResult = a + b;   // Memory: 3 gas
+    tempResult = tempResult * 2;  // Memory: 3 gas
+    return tempResult;
+}
+// 99.97% gas savings!
+```
+
+### 4. Short-Circuit Evaluation
+
+**❌ Evaluates all conditions**
+```solidity
+function check(uint256 a, uint256 b, uint256 c) public view returns (bool) {
+    if (expensiveCheck(a) && expensiveCheck(b) && expensiveCheck(c)) {
+        return true;
+    }
+    return false;
+}
+```
+
+**✅ Optimized: Cheap checks first**
+```solidity
+function check(uint256 a, uint256 b, uint256 c) public view returns (bool) {
+    // Check cheapest conditions first
+    if (a == 0) return false;  // Fails fast, saves gas
+    if (b == 0) return false;
+    
+    // Only run expensive checks if needed
+    if (expensiveCheck(a) && expensiveCheck(b) && expensiveCheck(c)) {
+        return true;
+    }
+    return false;
+}
+```
+
+### 5. Events Instead of Storage
+
+**❌ Store everything in storage**
+```solidity
+struct Trade {
+    uint256 id;
+    address buyer;
+    address seller;
+    uint256 amount;
+    uint256 price;
+}
+Trade[] public tradeHistory;  // Very expensive!
+
+function executeTrade(/*...*/) public {
+    tradeHistory.push(Trade(/*...*/));  // 20,000+ gas per trade
+}
+```
+
+**✅ Use events for historical data**
+```solidity
+event Trade(
+    uint256 indexed id,
+    address indexed buyer,
+    address indexed seller,
+    uint256 amount,
+    uint256 price
+);
+
+function executeTrade(/*...*/) public {
+    emit Trade(/*...*/);  // ~375 gas (98% savings!)
+}
+// Query events from frontend for history
+```
+
+**Dapp-Forge Implementation:**
+```solidity
+// ✅ We use events, not storage arrays
+event Trade(
+    uint256 id,
+    address user,
+    address tokenGet,
+    uint256 amountGet,
+    address tokenGive,
+    uint256 amountGive,
+    address userFill,
+    uint256 timestamp
+);
+
+// No storage array needed - save massive gas!
+```
+
+### 6. Batch Operations
+
+**❌ Multiple transactions**
+```javascript
+// User deposits ETH and tokens separately
+await exchange.depositEther({ value: ether(1) })    // 50,000 gas
+await exchange.depositToken(token.address, tokens(100))  // 65,000 gas
+// Total: 115,000 gas + 2 × 21,000 base fee = 157,000 gas
+```
+
+**✅ Single batched transaction**
+```solidity
+function depositBoth(address _token, uint256 _amount) public payable {
+    // Deposit ETH
+    tokens[ETHER_ADDRESS][msg.sender] += msg.value;
+    emit Deposit(ETHER_ADDRESS, msg.sender, msg.value, 
+        tokens[ETHER_ADDRESS][msg.sender]);
+    
+    // Deposit token
+    require(Token(_token).transferFrom(msg.sender, address(this), _amount));
+    tokens[_token][msg.sender] += _amount;
+    emit Deposit(_token, msg.sender, _amount, tokens[_token][msg.sender]);
+}
+// Total: ~100,000 gas + 21,000 base fee = 121,000 gas (23% savings!)
+```
+
+### 7. Uint256 vs Smaller Uints
+
+**Common Misconception:**
+```solidity
+// ❌ WRONG: uint8 is NOT cheaper than uint256!
+uint8 small;      // Still uses 32 bytes in storage
+uint256 large;    // Also uses 32 bytes in storage
+```
+
+**When smaller uints save gas:**
+```solidity
+// ✅ CORRECT: Only saves gas when packed
+uint128 a;  // 16 bytes
+uint128 b;  // 16 bytes - fits in same slot!
+// Now it's cheaper because only 1 SSTORE instead of 2
+```
+
+**Function arguments:**
+```solidity
+// uint256 is actually cheaper in function arguments!
+function process(uint8 x) public {
+    // Requires extra conversion: 3 gas
+}
+
+function process(uint256 x) public {
+    // No conversion needed: 0 gas
+}
+```
+
+**Rule of thumb:**
+- Use `uint256` by default
+- Use smaller uints ONLY when packing in structs
+- Never use smaller uints in function arguments
+
+### 8. Avoid Unnecessary Checks
+
+**❌ Redundant checks**
+```solidity
+function transfer(address _to, uint256 _amount) public {
+    require(_amount > 0, "Amount must be positive");
+    require(balance[msg.sender] >= _amount, "Insufficient balance");
+    require(_to != address(0), "Invalid recipient");
+    
+    balance[msg.sender] -= _amount;  // Would fail if insufficient anyway!
+    balance[_to] += _amount;
+}
+```
+
+**✅ Rely on Solidity 0.8.x checks**
+```solidity
+function transfer(address _to, uint256 _amount) public {
+    require(_to != address(0), "Invalid recipient");  // Necessary check
+    
+    // These checks are automatic in Solidity 0.8.x:
+    balance[msg.sender] -= _amount;  // Reverts if insufficient (underflow)
+    balance[_to] += _amount;         // Reverts if overflow
+}
+```
+
+### 9. Optimize Loops
+
+**❌ Expensive loop**
+```solidity
+function processUsers(address[] memory users) public {
+    for (uint256 i = 0; i < users.length; i++) {  // Multiple SLOAD per iteration
+        userBalances[users[i]] += 100;
+    }
+}
+```
+
+**✅ Cache loop length**
+```solidity
+function processUsers(address[] memory users) public {
+    uint256 length = users.length;  // Cache length
+    for (uint256 i = 0; i < length; i++) {  // No repeated SLOAD
+        userBalances[users[i]] += 100;
+    }
+}
+```
+
+**✅ Even better: Unchecked increment**
+```solidity
+function processUsers(address[] memory users) public {
+    uint256 length = users.length;
+    for (uint256 i = 0; i < length;) {
+        userBalances[users[i]] += 100;
+        unchecked { i++; }  // Save 120 gas per iteration!
+    }
+}
+```
+
+### 10. Function Visibility
+
+**❌ All functions public**
+```solidity
+function _transfer(address from, address to, uint256 amount) public {
+    // Called only internally but marked public
+}
+```
+
+**✅ Proper visibility**
+```solidity
+function _transfer(address from, address to, uint256 amount) internal {
+    // internal/private is cheaper than public
+}
+```
+
+**Gas savings:**
+- `public`: Includes external call overhead
+- `external`: Cheaper than public (uses calldata)
+- `internal/private`: Cheapest (no external interface)
+
+### 11. Constant and Immutable
+
+**❌ Regular storage variables**
+```solidity
+address public feeAccount;  // SLOAD: 200 gas every read
+uint256 public feePercent;  // SLOAD: 200 gas every read
+```
+
+**✅ Use immutable for constructor-set values**
+```solidity
+address public immutable feeAccount;  // Embedded in bytecode
+uint256 public immutable feePercent;  // 3 gas to read!
+
+constructor(address _feeAccount, uint256 _feePercent) {
+    feeAccount = _feeAccount;
+    feePercent = _feePercent;
+}
+```
+
+**✅ Use constant for compile-time values**
+```solidity
+address public constant ETHER_ADDRESS = address(0);  // 0 gas to read!
+uint256 public constant MAX_FEE = 100;               // 0 gas to read!
+```
+
+**Gas comparison:**
+```solidity
+// Storage:   200 gas per read
+// Immutable:   3 gas per read  (98.5% savings!)
+// Constant:    0 gas per read  (100% savings!)
+```
+
+### 12. Delete to Get Gas Refund
+
+**Get refunds by clearing storage:**
+```solidity
+function cancelOrder(uint256 _id) public {
+    _Order storage order = orders[_id];
+    require(order.user == msg.sender);
+    
+    delete orders[_id];  // Gas refund of 15,000!
+    orderCancelled[_id] = true;
+}
+```
+
+**Refund amounts:**
+- Set storage to zero: 15,000 gas refund
+- Delete entire struct: 15,000 × number of slots
+- Maximum refund: 50% of gas used
+
+## 📊 Gas Optimization Checklist
+
+### Storage Optimization
+- [ ] Pack variables into 32-byte slots
+- [ ] Use appropriate variable sizes
+- [ ] Use `immutable` for constructor values
+- [ ] Use `constant` for fixed values
+- [ ] Delete unused storage for refunds
+- [ ] Use mappings instead of arrays where possible
+
+### Memory Optimization
+- [ ] Use `memory` for temporary data
+- [ ] Use `calldata` for read-only function parameters
+- [ ] Avoid unnecessary copying
+
+### Logic Optimization
+- [ ] Short-circuit boolean expressions
+- [ ] Put cheap checks first
+- [ ] Cache repeated calculations
+- [ ] Use unchecked for safe arithmetic
+- [ ] Avoid redundant checks
+
+### Loop Optimization
+- [ ] Cache array length
+- [ ] Use unchecked increment
+- [ ] Avoid storage operations in loops
+- [ ] Consider loop unrolling for small fixed loops
+
+### Function Optimization
+- [ ] Use correct visibility (external > public)
+- [ ] Mark functions as `view` or `pure` when possible
+- [ ] Batch operations when possible
+- [ ] Use events instead of storage for history
+
+### Code Structure
+- [ ] Minimize external calls
+- [ ] Avoid dynamic arrays in storage
+- [ ] Use libraries for common functions
+- [ ] Consider using delegatecall patterns
+
+## 🛠️ Measuring Gas Costs
+
+### Using Truffle
+
+**Gas Reporter:**
+```bash
+npm install --save-dev eth-gas-reporter
+```
+
+**truffle-config.js:**
+```javascript
+module.exports = {
+  mocha: {
+    reporter: 'eth-gas-reporter',
+    reporterOptions: {
+      currency: 'USD',
+      gasPrice: 50,
+      token: 'ETH',
+      coinmarketcap: 'YOUR_API_KEY'
+    }
+  }
+}
+```
+
+**Run tests with gas report:**
+```bash
+truffle test
+```
+
+**Output:**
+```
+·-----------------------|---------------------------|-------------|----------------------------·
+|  Contract             ·  Method                   ·  Avg        ·  # calls  ·  usd (avg)     │
+························|···························|·············|···········|·················
+|  Exchange             ·  depositEther             ·    47,234   ·    10     ·        4.72    │
+························|···························|·············|···········|·················
+|  Exchange             ·  makeOrder                ·    98,721   ·     5     ·        9.87    │
+························|···························|·············|···········|·················
+|  Exchange             ·  fillOrder                ·   156,893   ·     3     ·       15.69    │
+·-----------------------|---------------------------|-------------|----------------------------·
+```
+
+### Manual Gas Tracking
+
+```javascript
+describe('Gas Costs', () => {
+  it('measures deposit gas', async () => {
+    const tx = await exchange.depositEther({ 
+      from: user1, 
+      value: ether(1) 
+    })
+    console.log('Gas used:', tx.receipt.gasUsed)
+  })
+
+  it('compares optimizations', async () => {
+    // Before optimization
+    const tx1 = await contract.unoptimizedFunction()
+    const gasBefore = tx1.receipt.gasUsed
+
+    // After optimization
+    const tx2 = await contract.optimizedFunction()
+    const gasAfter = tx2.receipt.gasUsed
+
+    const savings = gasBefore - gasAfter
+    const percentSaved = (savings / gasBefore) * 100
+
+    console.log(`Gas saved: ${savings} (${percentSaved}%)`)
+  })
+})
+```
+
+## 💡 Real-World Examples
+
+### Example 1: Order Creation
+
+**Before Optimization:**
+```solidity
+function makeOrder(
+    address _tokenGet,
+    uint256 _amountGet,
+    address _tokenGive,
+    uint256 _amountGive
+) public {
+    require(_tokenGet != address(0));
+    require(_tokenGive != address(0));
+    require(_amountGet > 0);
+    require(_amountGive > 0);
+    require(_tokenGet != _tokenGive);
+    require(balanceOf(_tokenGive, msg.sender) >= _amountGive);
+    
+    orderCount = orderCount + 1;
+    orders[orderCount] = _Order(
+        orderCount,
+        msg.sender,
+        _tokenGet,
+        _amountGet,
+        _tokenGive,
+        _amountGive,
+        block.timestamp
+    );
+    
+    emit Order(orderCount, msg.sender, _tokenGet, _amountGet, 
+        _tokenGive, _amountGive, block.timestamp);
+}
+// Gas: ~110,000
+```
+
+**After Optimization:**
+```solidity
+function makeOrder(
+    address _tokenGet,
+    uint256 _amountGet,
+    address _tokenGive,
+    uint256 _amountGive
+) external {  // Changed to external
+    // Removed unnecessary checks (rely on underflow protection)
+    require(balanceOf(_tokenGive, msg.sender) >= _amountGive);
+    
+    uint256 _orderCount = ++orderCount;  // Pre-increment, cache locally
+    
+    orders[_orderCount] = _Order({
+        id: _orderCount,
+        user: msg.sender,
+        tokenGet: _tokenGet,
+        amountGet: _amountGet,
+        tokenGive: _tokenGive,
+        amountGive: _amountGive,
+        timestamp: block.timestamp
+    });
+    
+    emit Order(_orderCount, msg.sender, _tokenGet, _amountGet, 
+        _tokenGive, _amountGive, block.timestamp);
+}
+// Gas: ~98,000 (11% savings!)
+```
+
+### Example 2: Bulk Transfers
+
+**Unoptimized:**
+```solidity
+function bulkTransfer(address[] memory recipients, uint256[] memory amounts) public {
+    require(recipients.length == amounts.length, "Length mismatch");
+    
+    for (uint256 i = 0; i < recipients.length; i++) {
+        require(balanceOf[msg.sender] >= amounts[i], "Insufficient balance");
+        balanceOf[msg.sender] -= amounts[i];
+        balanceOf[recipients[i]] += amounts[i];
+        emit Transfer(msg.sender, recipients[i], amounts[i]);
+    }
+}
+// Gas per transfer: ~52,000
+```
+
+**Optimized:**
+```solidity
+function bulkTransfer(
+    address[] calldata recipients, 
+    uint256[] calldata amounts
+) external {
+    uint256 length = recipients.length;
+    require(length == amounts.length, "Length mismatch");
+    
+    uint256 totalAmount;
+    for (uint256 i; i < length;) {
+        totalAmount += amounts[i];
+        unchecked { ++i; }
+    }
+    require(balanceOf[msg.sender] >= totalAmount, "Insufficient balance");
+    
+    balanceOf[msg.sender] -= totalAmount;
+    
+    for (uint256 i; i < length;) {
+        balanceOf[recipients[i]] += amounts[i];
+        emit Transfer(msg.sender, recipients[i], amounts[i]);
+        unchecked { ++i; }
+    }
+}
+// Gas per transfer: ~43,000 (17% savings!)
+```
+
+## 🎯 Optimization Priority
+
+**High Impact (Do First):**
+1. ✅ Storage slot packing
+2. ✅ Use events instead of storage arrays
+3. ✅ Mark functions external when possible
+4. ✅ Use immutable/constant
+5. ✅ Delete unused storage
+
+**Medium Impact:**
+6. ✅ Optimize loops
+7. ✅ Short-circuit conditions
+8. ✅ Batch operations
+9. ✅ Cache repeated reads
+10. ✅ Use unchecked arithmetic
+
+**Low Impact (Nice to Have):**
+11. ✅ Function modifiers vs internal functions
+12. ✅ Error message length
+13. ✅ Variable naming (shorter names = slightly cheaper deployment)
+
+## 🔗 Related Documentation
+
+- [Exchange Contract](/smart-contracts/exchange)
+- [Token Contract](/smart-contracts/token)
+- [Security Best Practices](/smart-contracts/security)
+- [Testing Guide](/smart-contracts/testing)
+
+---
+
+**Remember:** Always measure before and after optimization. Premature optimization can hurt code readability!
+
+**Tools to use:**
+- [eth-gas-reporter](https://github.com/cgewecke/eth-gas-reporter)
+- [hardhat-gas-reporter](https://github.com/cgewecke/hardhat-gas-reporter)
+- [Gas Station Network](https://www.opengsn.org/)

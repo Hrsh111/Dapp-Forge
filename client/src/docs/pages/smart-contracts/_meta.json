@@ -1,3 +1,8 @@
 {
-  "index": "Overview"
+  "index": "Overview",
+  "exchange": "Exchange Contract",
+  "token": "Token Contract",
+  "security": "Security Best Practices",
+  "testing": "Testing Guide",
+  "gas-optimization": "Gas Optimization"
 }

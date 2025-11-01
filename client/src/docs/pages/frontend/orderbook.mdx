@@ -1,0 +1,899 @@
+# OrderBook Component
+
+Displays all open buy and sell orders with one-click order filling functionality.
+
+## 📋 Overview
+
+**File:** `src/components/OrderBook.js`
+
+**Purpose:**
+- Display all open buy orders (bids)
+- Display all open sell orders (asks)
+- Enable one-click order filling
+- Show real-time order updates
+- Provide price discovery
+
+## 🎨 Visual Structure
+
+```
+┌──────────────────────────────────┐
+│         Order Book               │
+├──────────────────────────────────┤
+│  BUY ORDERS    │   SELL ORDERS   │
+├─────────────────┼─────────────────┤
+│ DAPP    ETH     │  DAPP    ETH    │
+├─────────────────┼─────────────────┤
+│ 10.0   0.100 ✓  │  10.0   0.110 ✓ │
+│ 15.0   0.095 ✓  │  20.0   0.115 ✓ │
+│ 20.0   0.090 ✓  │  15.0   0.120 ✓ │
+└──────────────────────────────────┘
+     (Green)            (Red)
+```
+
+## 🏗️ Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { OverlayTrigger, Tooltip } from 'react-bootstrap'
+import Spinner from './Spinner'
+import {
+  orderBookSelector,
+  orderBookLoadedSelector,
+  exchangeSelector,
+  accountSelector,
+  orderFillingSelector
+} from '../store/selectors'
+import { fillOrder } from '../store/interactions'
+
+class OrderBook extends Component {
+  render() {
+    return (
+      <div className="vertical">
+        <div className="card bg-dark text-white">
+          <div className="card-header">Order Book</div>
+          <div className="card-body order-book">
+            {this.props.showOrderBook ? (
+              <div>
+                {this.renderBuyOrders()}
+                <hr />
+                {this.renderSellOrders()}
+              </div>
+            ) : (
+              <Spinner type="table" />
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  renderBuyOrders() {
+    const { orderBook } = this.props
+    
+    return (
+      <div>
+        <table className="table table-dark table-sm small">
+          <thead>
+            <tr>
+              <th>DAPP</th>
+              <th>DAPP/ETH</th>
+              <th>ETH</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orderBook.buyOrders.map((order) => this.renderOrder(order, 'buy'))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  renderSellOrders() {
+    const { orderBook } = this.props
+    
+    return (
+      <div>
+        <table className="table table-dark table-sm small">
+          <thead>
+            <tr>
+              <th>DAPP</th>
+              <th>DAPP/ETH</th>
+              <th>ETH</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orderBook.sellOrders.map((order) => this.renderOrder(order, 'sell'))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  renderOrder(order, type) {
+    const { dispatch, exchange, account } = this.props
+    
+    return (
+      <OverlayTrigger
+        key={order.id}
+        placement='auto'
+        overlay={
+          <Tooltip id={order.id}>
+            {`Click here to ${type === 'buy' ? 'sell' : 'buy'}`}
+          </Tooltip>
+        }
+      >
+        <tr
+          className={`order-book-order order-${type}`}
+          onClick={(e) => fillOrder(dispatch, exchange, order, account)}
+        >
+          <td>{order.tokenAmount}</td>
+          <td className={`text-${type === 'buy' ? 'success' : 'danger'}`}>
+            {order.tokenPrice}
+          </td>
+          <td>{order.etherAmount}</td>
+        </tr>
+      </OverlayTrigger>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  const orderBookLoaded = orderBookLoadedSelector(state)
+  const orderFilling = orderFillingSelector(state)
+
+  return {
+    orderBook: orderBookSelector(state),
+    showOrderBook: orderBookLoaded && !orderFilling,
+    exchange: exchangeSelector(state),
+    account: accountSelector(state)
+  }
+}
+
+export default connect(mapStateToProps)(OrderBook)
+```
+
+## 🎯 Key Features
+
+### 1. Order Display
+
+**Buy Orders (Bids):**
+```javascript
+renderBuyOrders() {
+  const { orderBook } = this.props
+  
+  return (
+    <table className="table table-dark table-sm small">
+      <thead>
+        <tr>
+          <th>DAPP</th>
+          <th>DAPP/ETH</th>
+          <th>ETH</th>
+        </tr>
+      </thead>
+      <tbody>
+        {orderBook.buyOrders.map((order) => (
+          <tr key={order.id} className="order-book-order order-buy">
+            <td>{order.tokenAmount}</td>
+            <td className="text-success">{order.tokenPrice}</td>
+            <td>{order.etherAmount}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+```
+
+**Sell Orders (Asks):**
+```javascript
+renderSellOrders() {
+  const { orderBook } = this.props
+  
+  return (
+    <table className="table table-dark table-sm small">
+      <tbody>
+        {orderBook.sellOrders.map((order) => (
+          <tr key={order.id} className="order-book-order order-sell">
+            <td>{order.tokenAmount}</td>
+            <td className="text-danger">{order.tokenPrice}</td>
+            <td>{order.etherAmount}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+```
+
+### 2. One-Click Order Filling
+
+**Click Handler:**
+```javascript
+renderOrder(order, type) {
+  return (
+    <tr
+      className="order-book-order"
+      onClick={(e) => this.handleFillOrder(order)}
+    >
+      <td>{order.tokenAmount}</td>
+      <td>{order.tokenPrice}</td>
+      <td>{order.etherAmount}</td>
+    </tr>
+  )
+}
+
+handleFillOrder = (order) => {
+  const { dispatch, exchange, account } = this.props
+  fillOrder(dispatch, exchange, order, account)
+}
+```
+
+### 3. Tooltips
+
+**Interactive Tooltips:**
+```javascript
+<OverlayTrigger
+  placement='auto'
+  overlay={
+    <Tooltip id={order.id}>
+      {`Click here to ${type === 'buy' ? 'sell' : 'buy'}`}
+    </Tooltip>
+  }
+>
+  <tr onClick={...}>
+    {/* Order data */}
+  </tr>
+</OverlayTrigger>
+```
+
+### 4. Real-time Updates
+
+**Order Book Selector:**
+```javascript
+// store/selectors.js
+export const orderBookSelector = createSelector(
+  openOrders,
+  orders => {
+    // Decorate orders
+    orders = decorateOrderBookOrders(orders)
+    
+    // Sort by price
+    orders = orders.sort((a, b) => b.tokenPrice - a.tokenPrice)
+    
+    // Separate buy and sell orders
+    return {
+      buyOrders: orders.filter(o => o.orderType === 'buy'),
+      sellOrders: orders.filter(o => o.orderType === 'sell')
+    }
+  }
+)
+```
+
+## 🎨 Styling
+
+### Color Coding
+
+```css
+/* Buy orders - green */
+.order-buy {
+  cursor: pointer;
+}
+
+.order-buy:hover {
+  background-color: rgba(25, 135, 84, 0.1);
+}
+
+.order-buy .price {
+  color: #198754;
+}
+
+/* Sell orders - red */
+.order-sell {
+  cursor: pointer;
+}
+
+.order-sell:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.order-sell .price {
+  color: #dc3545;
+}
+
+/* Order book container */
+.order-book {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.order-book table {
+  margin-bottom: 0;
+}
+
+.order-book-order {
+  transition: background-color 0.2s;
+}
+```
+
+### Table Styling
+
+```javascript
+<table className="table table-dark table-sm small">
+  <thead>
+    <tr>
+      <th className="text-start">DAPP</th>
+      <th className="text-center">DAPP/ETH</th>
+      <th className="text-end">ETH</th>
+    </tr>
+  </thead>
+  <tbody>
+    {/* Orders */}
+  </tbody>
+</table>
+```
+
+## 🔄 Data Processing
+
+### Order Decoration
+
+**Add calculated fields:**
+```javascript
+const decorateOrderBookOrders = (orders) => {
+  return orders.map((order) => {
+    order = decorateOrder(order)
+    order = decorateOrderBookOrder(order)
+    return order
+  })
+}
+
+const decorateOrder = (order) => {
+  let etherAmount
+  let tokenAmount
+
+  // Determine order type
+  if (order.tokenGive === ETHER_ADDRESS) {
+    etherAmount = order.amountGive
+    tokenAmount = order.amountGet
+  } else {
+    etherAmount = order.amountGet
+    tokenAmount = order.amountGive
+  }
+
+  // Calculate the token price to 5 decimal places
+  const precision = 100000
+  let tokenPrice = (etherAmount / tokenAmount)
+  tokenPrice = Math.round(tokenPrice * precision) / precision
+
+  return {
+    ...order,
+    etherAmount: ether(etherAmount),
+    tokenAmount: tokens(tokenAmount),
+    tokenPrice,
+    formattedTimestamp: moment.unix(order.timestamp).format('h:mm:ss a M/D')
+  }
+}
+
+const decorateOrderBookOrder = (order) => {
+  const orderType = order.tokenGive === ETHER_ADDRESS ? 'buy' : 'sell'
+
+  return {
+    ...order,
+    orderType,
+    orderTypeClass: (orderType === 'buy' ? 'success' : 'danger'),
+    orderFillAction: (orderType === 'buy' ? 'sell' : 'buy')
+  }
+}
+```
+
+### Sorting Orders
+
+**By Price:**
+```javascript
+// Sort buy orders - highest price first
+const sortedBuyOrders = buyOrders.sort((a, b) => 
+  b.tokenPrice - a.tokenPrice
+)
+
+// Sort sell orders - lowest price first
+const sortedSellOrders = sellOrders.sort((a, b) => 
+  a.tokenPrice - b.tokenPrice
+)
+```
+
+**By Time:**
+```javascript
+const sortedOrders = orders.sort((a, b) => 
+  b.timestamp - a.timestamp
+)
+```
+
+## 🎯 Advanced Features
+
+### 1. Order Grouping
+
+**Group by price level:**
+```javascript
+groupOrdersByPrice(orders) {
+  const grouped = {}
+  
+  orders.forEach(order => {
+    const price = order.tokenPrice.toFixed(5)
+    
+    if (!grouped[price]) {
+      grouped[price] = {
+        price: price,
+        tokenAmount: 0,
+        etherAmount: 0,
+        orders: []
+      }
+    }
+    
+    grouped[price].tokenAmount += parseFloat(order.tokenAmount)
+    grouped[price].etherAmount += parseFloat(order.etherAmount)
+    grouped[price].orders.push(order)
+  })
+  
+  return Object.values(grouped)
+}
+
+renderGroupedOrders() {
+  const grouped = this.groupOrdersByPrice(this.props.orderBook.buyOrders)
+  
+  return grouped.map(level => (
+    <tr key={level.price}>
+      <td>{level.tokenAmount.toFixed(2)}</td>
+      <td>{level.price}</td>
+      <td>{level.etherAmount.toFixed(4)}</td>
+      <td className="text-muted">({level.orders.length})</td>
+    </tr>
+  ))
+}
+```
+
+### 2. Depth Chart
+
+**Visual representation of liquidity:**
+```javascript
+renderDepthChart() {
+  const buyDepth = this.calculateDepth(this.props.orderBook.buyOrders)
+  const sellDepth = this.calculateDepth(this.props.orderBook.sellOrders)
+  
+  return (
+    <div className="depth-chart">
+      {/* Render bars for each price level */}
+      {buyDepth.map(level => (
+        <div 
+          key={level.price}
+          className="depth-bar buy"
+          style={{ width: `${level.percentage}%` }}
+        />
+      ))}
+    </div>
+  )
+}
+
+calculateDepth(orders) {
+  let cumulative = 0
+  const maxVolume = orders.reduce((sum, o) => 
+    sum + parseFloat(o.etherAmount), 0
+  )
+  
+  return orders.map(order => {
+    cumulative += parseFloat(order.etherAmount)
+    return {
+      price: order.tokenPrice,
+      volume: cumulative,
+      percentage: (cumulative / maxVolume) * 100
+    }
+  })
+}
+```
+
+### 3. Spread Display
+
+**Show bid-ask spread:**
+```javascript
+renderSpread() {
+  const { buyOrders, sellOrders } = this.props.orderBook
+  
+  if (buyOrders.length === 0 || sellOrders.length === 0) {
+    return null
+  }
+  
+  const bestBid = buyOrders[0].tokenPrice
+  const bestAsk = sellOrders[0].tokenPrice
+  const spread = bestAsk - bestBid
+  const spreadPercent = (spread / bestAsk) * 100
+  
+  return (
+    <div className="spread-display">
+      <small className="text-muted">
+        Spread: {spread.toFixed(5)} ETH ({spreadPercent.toFixed(2)}%)
+      </small>
+    </div>
+  )
+}
+```
+
+### 4. Order Size Indicators
+
+**Visual size representation:**
+```javascript
+renderOrderWithSize(order, maxSize) {
+  const sizePercent = (order.etherAmount / maxSize) * 100
+  
+  return (
+    <tr key={order.id}>
+      <td>
+        <div className="order-size-container">
+          <div 
+            className="order-size-bar"
+            style={{ width: `${sizePercent}%` }}
+          />
+          <span className="order-size-text">
+            {order.tokenAmount}
+          </span>
+        </div>
+      </td>
+      <td>{order.tokenPrice}</td>
+      <td>{order.etherAmount}</td>
+    </tr>
+  )
+}
+```
+
+### 5. Filtering Options
+
+**Filter by minimum size:**
+```javascript
+state = {
+  minOrderSize: 0
+}
+
+renderFilterControls() {
+  return (
+    <div className="order-filters mb-2">
+      <label className="form-label small">Min Order Size (ETH)</label>
+      <input
+        type="number"
+        className="form-control form-control-sm"
+        value={this.state.minOrderSize}
+        onChange={(e) => this.setState({ 
+          minOrderSize: parseFloat(e.target.value) 
+        })}
+        step="0.01"
+        min="0"
+      />
+    </div>
+  )
+}
+
+getFilteredOrders(orders) {
+  return orders.filter(order => 
+    parseFloat(order.etherAmount) >= this.state.minOrderSize
+  )
+}
+```
+
+### 6. My Orders Highlighting
+
+**Highlight user's own orders:**
+```javascript
+renderOrder(order, type) {
+  const { account } = this.props
+  const isMyOrder = order.user === account
+  
+  return (
+    <tr
+      className={`
+        order-book-order 
+        order-${type}
+        ${isMyOrder ? 'my-order' : ''}
+      `}
+      onClick={!isMyOrder ? (e) => this.handleFillOrder(order) : null}
+    >
+      <td>
+        {isMyOrder && <span className="badge bg-primary me-1">Mine</span>}
+        {order.tokenAmount}
+      </td>
+      <td>{order.tokenPrice}</td>
+      <td>{order.etherAmount}</td>
+    </tr>
+  )
+}
+```
+
+**CSS:**
+```css
+.my-order {
+  border-left: 3px solid #0d6efd;
+  background-color: rgba(13, 110, 253, 0.05);
+  cursor: default;
+}
+
+.my-order:hover {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+```
+
+## 🔗 Redux Integration
+
+### Selectors
+
+```javascript
+// Get open orders
+const openOrders = createSelector(
+  allOrders,
+  orders => {
+    return orders.filter(o => o.orderFillAction !== 'filled')
+  }
+)
+
+// Get order book
+export const orderBookSelector = createSelector(
+  openOrders,
+  orders => {
+    // Decorate orders
+    orders = decorateOrderBookOrders(orders)
+    
+    // Separate by type
+    const buyOrders = orders.filter(o => o.orderType === 'buy')
+    const sellOrders = orders.filter(o => o.orderType === 'sell')
+    
+    return {
+      buyOrders: buyOrders.sort((a, b) => b.tokenPrice - a.tokenPrice),
+      sellOrders: sellOrders.sort((a, b) => a.tokenPrice - b.tokenPrice)
+    }
+  }
+)
+
+// Check if order book is loaded
+export const orderBookLoadedSelector = createSelector(
+  allOrdersLoaded,
+  loaded => loaded
+)
+```
+
+### Fill Order Action
+
+```javascript
+// store/interactions.js
+export const fillOrder = (dispatch, exchange, order, account) => {
+  dispatch(orderFilling())
+  
+  exchange.methods.fillOrder(order.id)
+    .send({ from: account })
+    .on('transactionHash', (hash) => {
+      console.log('Transaction hash:', hash)
+    })
+    .on('error', (error) => {
+      console.error(error)
+      window.alert('There was an error filling the order!')
+    })
+}
+```
+
+## 🐛 Common Issues
+
+### Issue 1: Orders Not Displaying
+
+**Problem:** Order book appears empty
+
+**Solution:** Check Redux state
+```javascript
+// Debug selector
+console.log('All orders:', this.props.allOrders)
+console.log('Open orders:', this.props.openOrders)
+console.log('Order book:', this.props.orderBook)
+
+// Ensure orders are loaded
+if (!this.props.orderBookLoaded) {
+  return <Spinner />
+}
+```
+
+### Issue 2: Fill Order Fails
+
+**Problem:** Transaction reverts when filling order
+
+**Solution:** Validate before filling
+```javascript
+handleFillOrder = async (order) => {
+  const { account, exchange, token } = this.props
+  
+  // Check if order is still open
+  const orderFilled = await exchange.methods.orderFilled(order.id).call()
+  if (orderFilled) {
+    window.alert('Order already filled!')
+    return
+  }
+  
+  // Check user has enough balance
+  const requiredBalance = order.orderType === 'buy' 
+    ? order.tokenAmount 
+    : order.etherAmount
+    
+  const balance = await this.getBalance(account)
+  if (balance < requiredBalance) {
+    window.alert('Insufficient balance!')
+    return
+  }
+  
+  // Proceed with fill
+  fillOrder(dispatch, exchange, order, account)
+}
+```
+
+### Issue 3: Incorrect Sorting
+
+**Problem:** Orders not sorted by best price
+
+**Solution:** Verify sort logic
+```javascript
+// Buy orders: highest price first (descending)
+const buyOrders = orders
+  .filter(o => o.orderType === 'buy')
+  .sort((a, b) => {
+    return parseFloat(b.tokenPrice) - parseFloat(a.tokenPrice)
+  })
+
+// Sell orders: lowest price first (ascending)
+const sellOrders = orders
+  .filter(o => o.orderType === 'sell')
+  .sort((a, b) => {
+    return parseFloat(a.tokenPrice) - parseFloat(b.tokenPrice)
+  })
+```
+
+## 🧪 Testing
+
+```javascript
+import { render, screen, fireEvent } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import OrderBook from './OrderBook'
+import configureStore from '../store/configureStore'
+
+describe('OrderBook Component', () => {
+  let store
+
+  beforeEach(() => {
+    const mockOrders = [
+      {
+        id: 1,
+        user: '0x123...',
+        tokenAmount: '10',
+        tokenPrice: 0.1,
+        etherAmount: '1',
+        orderType: 'buy'
+      },
+      {
+        id: 2,
+        user: '0x456...',
+        tokenAmount: '20',
+        tokenPrice: 0.11,
+        etherAmount: '2.2',
+        orderType: 'sell'
+      }
+    ]
+    
+    store = configureStore({
+      exchange: {
+        allOrders: { loaded: true, data: mockOrders }
+      }
+    })
+  })
+
+  it('renders buy and sell orders', () => {
+    render(
+      <Provider store={store}>
+        <OrderBook />
+      </Provider>
+    )
+    
+    expect(screen.getByText('BUY ORDERS')).toBeInTheDocument()
+    expect(screen.getByText('SELL ORDERS')).toBeInTheDocument()
+  })
+
+  it('calls fillOrder on order click', () => {
+    const { container } = render(
+      <Provider store={store}>
+        <OrderBook />
+      </Provider>
+    )
+    
+    const order = container.querySelector('.order-book-order')
+    fireEvent.click(order)
+    
+    // Assert fillOrder was called
+  })
+
+  it('displays orders sorted by price', () => {
+    render(
+      <Provider store={store}>
+        <OrderBook />
+      </Provider>
+    )
+    
+    const prices = screen.getAllByText(/0\.\d+/)
+    // Assert prices are in correct order
+  })
+})
+```
+
+## 📊 Performance Optimization
+
+### 1. Memoization
+
+```javascript
+import { memo } from 'react'
+
+const OrderRow = memo(({ order, onClick }) => (
+  <tr onClick={onClick}>
+    <td>{order.tokenAmount}</td>
+    <td>{order.tokenPrice}</td>
+    <td>{order.etherAmount}</td>
+  </tr>
+))
+```
+
+### 2. Virtual Scrolling
+
+```javascript
+import { FixedSizeList } from 'react-window'
+
+renderVirtualizedOrders() {
+  const Row = ({ index, style }) => {
+    const order = this.props.orderBook.buyOrders[index]
+    return (
+      <div style={style}>
+        {this.renderOrder(order, 'buy')}
+      </div>
+    )
+  }
+
+  return (
+    <FixedSizeList
+      height={400}
+      itemCount={this.props.orderBook.buyOrders.length}
+      itemSize={35}
+      width="100%"
+    >
+      {Row}
+    </FixedSizeList>
+  )
+}
+```
+
+### 3. Debounced Updates
+
+```javascript
+import { debounce } from 'lodash'
+
+componentDidUpdate(prevProps) {
+  if (prevProps.orderBook !== this.props.orderBook) {
+    this.debouncedUpdate()
+  }
+}
+
+debouncedUpdate = debounce(() => {
+  this.forceUpdate()
+}, 300)
+```
+
+## 🔗 Related Components
+
+- [NewOrder](/frontend/neworder) - Create orders that appear here
+- [MyTransactions](/frontend/mytransactions) - View filled orders
+- [PriceChart](/frontend/pricechart) - Visual price representation
+- [Trades](/frontend/trades) - Recent executed trades
+
+## 📚 Related Documentation
+
+- [Exchange Contract](/smart-contracts/exchange) - fillOrder function
+- [State Management](/state-management) - Order book selectors
+- [API Reference](/api-reference) - fillOrder interaction
+
+---
+
+**Next:** Learn about the [PriceChart Component](/frontend/pricechart) →

@@ -1,0 +1,689 @@
+# Navbar Component
+
+The top navigation bar displaying application branding, user account information, and network status.
+
+## 📋 Overview
+
+**File:** `src/components/Navbar.js`
+
+**Purpose:**
+- Display application logo and title
+- Show connected Ethereum account
+- Display current network name
+- Provide consistent navigation header
+
+## 🎨 Visual Structure
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🦊 Dapp-Forge                        Sepolia  0x742...0bEb │
+└─────────────────────────────────────────────────────────┘
+     Logo & Title                       Network    Account
+```
+
+## 🏗️ Component Code
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { accountSelector } from '../store/selectors'
+
+class Navbar extends Component {
+  render() {
+    return (
+      <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div className="container-fluid">
+          {/* Brand/Logo */}
+          <a className="navbar-brand" href="/">
+            <img 
+              src="/logo.png" 
+              width="30" 
+              height="30" 
+              className="d-inline-block align-top" 
+              alt="Dapp-Forge Logo"
+            />
+            {' '}
+            Dapp-Forge
+          </a>
+
+          {/* Account & Network Info */}
+          <ul className="navbar-nav ms-auto">
+            <li className="nav-item">
+              <a 
+                className="nav-link small"
+                href={`https://etherscan.io/address/${this.props.account}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {this.props.account ? (
+                  <span>{this.shortenAddress(this.props.account)}</span>
+                ) : (
+                  <span>Connect Wallet</span>
+                )}
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    )
+  }
+
+  shortenAddress(address) {
+    if (!address) return ''
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+}
+
+function mapStateToProps(state) {
+  return {
+    account: accountSelector(state)
+  }
+}
+
+export default connect(mapStateToProps)(Navbar)
+```
+
+## 🎯 Key Features
+
+### 1. Application Branding
+
+**Logo Display:**
+```javascript
+<img 
+  src="/logo.png" 
+  width="30" 
+  height="30" 
+  className="d-inline-block align-top" 
+  alt="Dapp-Forge Logo"
+/>
+```
+
+**Title:**
+```javascript
+<a className="navbar-brand" href="/">
+  Dapp-Forge
+</a>
+```
+
+### 2. Account Display
+
+**Connected State:**
+```javascript
+{this.props.account ? (
+  <span>{this.shortenAddress(this.props.account)}</span>
+) : (
+  <span>Connect Wallet</span>
+)}
+```
+
+**Address Shortening:**
+```javascript
+shortenAddress(address) {
+  if (!address) return ''
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+// Example:
+// Input:  0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
+// Output: 0x742d...0bEb
+```
+
+### 3. Etherscan Link
+
+**Direct link to account on Etherscan:**
+```javascript
+<a 
+  href={`https://etherscan.io/address/${this.props.account}`}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  {this.shortenAddress(this.props.account)}
+</a>
+```
+
+**Network-specific links:**
+```javascript
+getEtherscanLink(address, network) {
+  const baseUrls = {
+    1: 'https://etherscan.io',
+    5: 'https://goerli.etherscan.io',
+    11155111: 'https://sepolia.etherscan.io',
+  }
+  const baseUrl = baseUrls[network] || 'https://etherscan.io'
+  return `${baseUrl}/address/${address}`
+}
+```
+
+### 4. Network Indicator
+
+**Display current network:**
+```javascript
+<span className="badge bg-light text-dark">
+  {this.getNetworkName(this.props.networkId)}
+</span>
+
+getNetworkName(networkId) {
+  const networks = {
+    1: 'Mainnet',
+    5: 'Goerli',
+    11155111: 'Sepolia',
+    1337: 'Localhost'
+  }
+  return networks[networkId] || 'Unknown Network'
+}
+```
+
+## 🎨 Styling
+
+### Bootstrap Classes
+
+```javascript
+// Navigation bar
+className="navbar navbar-expand-lg navbar-dark bg-primary"
+
+// Container
+className="container-fluid"
+
+// Brand link
+className="navbar-brand"
+
+// Navigation list
+className="navbar-nav ms-auto"
+
+// Navigation item
+className="nav-item"
+
+// Navigation link
+className="nav-link small"
+```
+
+### Custom CSS
+
+**App.css additions:**
+```css
+.navbar {
+  margin-bottom: 20px;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.navbar-brand img {
+  margin-right: 0.5rem;
+}
+
+.nav-link.small {
+  font-size: 0.875rem;
+}
+
+/* Account badge */
+.account-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.account-badge:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+```
+
+## 🔗 Redux Connection
+
+### State Mapping
+
+```javascript
+function mapStateToProps(state) {
+  return {
+    account: accountSelector(state),
+    networkId: networkIdSelector(state)
+  }
+}
+```
+
+### Selectors Used
+
+**Account Selector:**
+```javascript
+// store/selectors.js
+export const accountSelector = createSelector(
+  state => state.web3.account,
+  account => account
+)
+```
+
+**Network Selector:**
+```javascript
+export const networkIdSelector = createSelector(
+  state => state.web3.networkId,
+  networkId => networkId
+)
+```
+
+## 🎯 Enhanced Features
+
+### 1. Network Badge with Color Coding
+
+```javascript
+<span className={`badge ${this.getNetworkBadgeClass(this.props.networkId)}`}>
+  {this.getNetworkName(this.props.networkId)}
+</span>
+
+getNetworkBadgeClass(networkId) {
+  switch(networkId) {
+    case 1:
+      return 'bg-success'  // Mainnet - green
+    case 5:
+      return 'bg-warning'  // Goerli - yellow
+    case 11155111:
+      return 'bg-info'     // Sepolia - blue
+    case 1337:
+      return 'bg-secondary' // Localhost - gray
+    default:
+      return 'bg-danger'   // Unknown - red
+  }
+}
+```
+
+### 2. Copy Address Feature
+
+```javascript
+<button 
+  className="btn btn-sm btn-outline-light"
+  onClick={() => this.copyToClipboard(this.props.account)}
+>
+  {this.shortenAddress(this.props.account)}
+  <i className="bi bi-clipboard ms-1"></i>
+</button>
+
+copyToClipboard(text) {
+  navigator.clipboard.writeText(text)
+  // Show toast notification
+  this.showToast('Address copied to clipboard!')
+}
+```
+
+### 3. Dropdown Menu
+
+```javascript
+<div className="dropdown">
+  <button 
+    className="btn btn-sm btn-outline-light dropdown-toggle"
+    type="button"
+    data-bs-toggle="dropdown"
+  >
+    {this.shortenAddress(this.props.account)}
+  </button>
+  <ul className="dropdown-menu dropdown-menu-end">
+    <li>
+      <a className="dropdown-item" href="#" onClick={this.viewOnEtherscan}>
+        View on Etherscan
+      </a>
+    </li>
+    <li>
+      <a className="dropdown-item" href="#" onClick={this.copyAddress}>
+        Copy Address
+      </a>
+    </li>
+    <li><hr className="dropdown-divider" /></li>
+    <li>
+      <a className="dropdown-item" href="#" onClick={this.disconnectWallet}>
+        Disconnect
+      </a>
+    </li>
+  </ul>
+</div>
+```
+
+### 4. Balance Display
+
+```javascript
+<div className="d-flex align-items-center">
+  <span className="badge bg-light text-dark me-2">
+    {this.formatBalance(this.props.ethBalance)} ETH
+  </span>
+  <span className="badge bg-light text-dark">
+    {this.formatBalance(this.props.tokenBalance)} DAPP
+  </span>
+</div>
+
+formatBalance(balance) {
+  if (!balance) return '0.00'
+  return Number(balance).toFixed(4)
+}
+```
+
+### 5. Network Warning
+
+```javascript
+{this.props.networkId !== 11155111 && (
+  <div className="alert alert-warning alert-dismissible" role="alert">
+    <strong>Wrong Network!</strong> Please switch to Sepolia testnet.
+    <button type="button" className="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+)}
+```
+
+## 📱 Responsive Design
+
+### Mobile Considerations
+
+```javascript
+<nav className="navbar navbar-expand-lg navbar-dark bg-primary">
+  {/* Toggler for mobile */}
+  <button 
+    className="navbar-toggler" 
+    type="button"
+    data-bs-toggle="collapse"
+    data-bs-target="#navbarNav"
+  >
+    <span className="navbar-toggler-icon"></span>
+  </button>
+
+  {/* Collapsible content */}
+  <div className="collapse navbar-collapse" id="navbarNav">
+    <ul className="navbar-nav ms-auto">
+      {/* Nav items */}
+    </ul>
+  </div>
+</nav>
+```
+
+### CSS Media Queries
+
+```css
+@media (max-width: 768px) {
+  .navbar-brand {
+    font-size: 1rem;
+  }
+  
+  .navbar-brand img {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .nav-link.small {
+    font-size: 0.75rem;
+  }
+}
+```
+
+## 🔄 Dynamic Updates
+
+### Account Change Detection
+
+```javascript
+componentDidUpdate(prevProps) {
+  if (prevProps.account !== this.props.account) {
+    console.log('Account changed:', this.props.account)
+    // Could trigger animations or notifications
+  }
+}
+```
+
+### Network Change Detection
+
+```javascript
+componentDidUpdate(prevProps) {
+  if (prevProps.networkId !== this.props.networkId) {
+    console.log('Network changed:', this.props.networkId)
+    this.checkNetworkCompatibility()
+  }
+}
+
+checkNetworkCompatibility() {
+  const supportedNetworks = [1, 5, 11155111, 1337]
+  if (!supportedNetworks.includes(this.props.networkId)) {
+    this.showNetworkWarning()
+  }
+}
+```
+
+## 🧪 Testing
+
+### Component Tests
+
+```javascript
+import { render, screen } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import Navbar from './Navbar'
+import configureStore from '../store/configureStore'
+
+describe('Navbar Component', () => {
+  let store
+
+  beforeEach(() => {
+    store = configureStore()
+  })
+
+  it('renders Dapp-Forge title', () => {
+    render(
+      <Provider store={store}>
+        <Navbar />
+      </Provider>
+    )
+    expect(screen.getByText(/Dapp-Forge/i)).toBeInTheDocument()
+  })
+
+  it('displays shortened address when account connected', () => {
+    const mockState = {
+      web3: {
+        account: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+      }
+    }
+    store = configureStore(mockState)
+    
+    render(
+      <Provider store={store}>
+        <Navbar />
+      </Provider>
+    )
+    expect(screen.getByText(/0x742d...0bEb/i)).toBeInTheDocument()
+  })
+
+  it('shows "Connect Wallet" when no account', () => {
+    render(
+      <Provider store={store}>
+        <Navbar />
+      </Provider>
+    )
+    expect(screen.getByText(/Connect Wallet/i)).toBeInTheDocument()
+  })
+})
+```
+
+### Address Shortening Tests
+
+```javascript
+describe('shortenAddress', () => {
+  it('shortens address correctly', () => {
+    const navbar = new Navbar()
+    const address = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+    const shortened = navbar.shortenAddress(address)
+    expect(shortened).toBe('0x742d...0bEb')
+  })
+
+  it('handles empty address', () => {
+    const navbar = new Navbar()
+    const shortened = navbar.shortenAddress('')
+    expect(shortened).toBe('')
+  })
+
+  it('handles null address', () => {
+    const navbar = new Navbar()
+    const shortened = navbar.shortenAddress(null)
+    expect(shortened).toBe('')
+  })
+})
+```
+
+## 🎯 Best Practices
+
+### 1. Semantic HTML
+
+```javascript
+// ✅ GOOD: Use semantic nav element
+<nav className="navbar">
+  <a className="navbar-brand" href="/">Logo</a>
+  <ul className="navbar-nav">
+    <li className="nav-item">...</li>
+  </ul>
+</nav>
+```
+
+### 2. Accessibility
+
+```javascript
+// ✅ GOOD: Include ARIA labels
+<button 
+  className="navbar-toggler"
+  aria-label="Toggle navigation"
+  aria-expanded="false"
+>
+  <span className="navbar-toggler-icon"></span>
+</button>
+```
+
+### 3. External Link Security
+
+```javascript
+// ✅ GOOD: Include security attributes
+<a 
+  href={etherscanUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  View on Etherscan
+</a>
+```
+
+## 🐛 Common Issues
+
+### Issue 1: Address Not Displaying
+
+**Problem:** Account shows as "Connect Wallet" even when connected
+
+**Solution:** Check Redux state
+```javascript
+// Debug in browser console
+console.log(store.getState().web3.account)
+
+// Ensure selector is correct
+const accountSelector = state => state.web3.account
+```
+
+### Issue 2: Etherscan Link Wrong Network
+
+**Problem:** Link goes to mainnet even on testnet
+
+**Solution:** Pass network ID
+```javascript
+<a href={this.getEtherscanLink(account, networkId)}>
+  View on Etherscan
+</a>
+
+getEtherscanLink(address, networkId) {
+  const networks = {
+    1: 'etherscan.io',
+    11155111: 'sepolia.etherscan.io'
+  }
+  const domain = networks[networkId] || 'etherscan.io'
+  return `https://${domain}/address/${address}`
+}
+```
+
+### Issue 3: Navbar Overlapping Content
+
+**Problem:** Content appears behind navbar
+
+**Solution:** Add margin or padding
+```css
+body {
+  padding-top: 70px; /* Navbar height */
+}
+
+/* Or */
+.content {
+  margin-top: 20px;
+}
+```
+
+## 💡 Advanced Features
+
+### 1. ENS Name Resolution
+
+```javascript
+async componentDidMount() {
+  if (this.props.account && this.props.web3) {
+    const ensName = await this.resolveENS(this.props.account)
+    this.setState({ ensName })
+  }
+}
+
+async resolveENS(address) {
+  try {
+    const name = await this.props.web3.eth.ens.reverse(address)
+    return name
+  } catch (error) {
+    return null
+  }
+}
+
+// Display
+{this.state.ensName || this.shortenAddress(this.props.account)}
+```
+
+### 2. Multi-Account Support
+
+```javascript
+<div className="dropdown">
+  <button className="dropdown-toggle">
+    {this.shortenAddress(this.props.account)}
+  </button>
+  <ul className="dropdown-menu">
+    {this.props.accounts.map(account => (
+      <li key={account}>
+        <a onClick={() => this.switchAccount(account)}>
+          {this.shortenAddress(account)}
+        </a>
+      </li>
+    ))}
+  </ul>
+</div>
+```
+
+### 3. Theme Toggle
+
+```javascript
+<button 
+  className="btn btn-sm"
+  onClick={this.toggleTheme}
+>
+  <i className={`bi bi-${this.state.darkMode ? 'sun' : 'moon'}`}></i>
+</button>
+
+toggleTheme() {
+  this.setState(prev => ({ darkMode: !prev.darkMode }))
+  document.body.setAttribute('data-theme', 
+    this.state.darkMode ? 'light' : 'dark'
+  )
+}
+```
+
+## 🔗 Related Components
+
+- [App](/frontend/app) - Root component
+- [Balance](/frontend/balance) - Balance display (could integrate here)
+- [Content](/frontend/content) - Main content area
+
+## 📚 Related Documentation
+
+- [State Management](/state-management) - Redux selectors
+- [Getting Started](/getting-started) - MetaMask setup
+- [API Reference](/api-reference) - Web3 functions
+
+---
+
+**Next:** Learn about the [Balance Component](/frontend/balance) →

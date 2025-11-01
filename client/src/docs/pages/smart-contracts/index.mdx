@@ -1,64 +1,456 @@
-# Smart Contracts
+# Smart Contracts Overview
 
-Dapp-Forge uses Ethereum smart contracts for decentralized trading.
+Dapp-Forge is powered by two main Solidity smart contracts that work together to enable decentralized token trading on the Ethereum blockchain.
 
-## Exchange Contract
+## 📋 Contract Architecture
 
-The core contract managing all trading operations.
+```
+┌─────────────────────────────────────┐
+│         Token.sol (ERC-20)          │
+│  - Standard token implementation    │
+│  - Transfer & approval functions    │
+│  - Balance tracking                 │
+└──────────────┬──────────────────────┘
+               │
+               │ (tokens deposited/withdrawn)
+               │
+┌──────────────▼──────────────────────┐
+│         Exchange.sol                │
+│  - Order management                 │
+│  - Trade execution                  │
+│  - Balance tracking (internal)      │
+│  - Fee collection                   │
+└─────────────────────────────────────┘
+```
 
-### Key Functions
+## 🎯 Key Concepts
 
-#### makeOrder()
+### Decentralized Exchange (DEX)
+Unlike centralized exchanges (like Coinbase), Dapp-Forge:
+- **Non-custodial**: You control your private keys
+- **Trustless**: No need to trust a third party
+- **Transparent**: All transactions on blockchain
+- **Censorship-resistant**: No one can block your trades
 
-Create a new limit order.
+### Order Book Model
+Dapp-Forge uses an on-chain order book:
+- **Makers**: Users who create orders (provide liquidity)
+- **Takers**: Users who fill existing orders
+- **Limit Orders**: Orders executed at specific price or better
+- **Instant Settlement**: Trades settle immediately on-chain
+
+## 📜 Contract Overview
+
+### Exchange.sol
+The core trading contract that manages:
+- ✅ Depositing/withdrawing ETH and tokens
+- ✅ Creating buy and sell orders
+- ✅ Filling orders (executing trades)
+- ✅ Canceling orders
+- ✅ Tracking balances
+- ✅ Collecting trading fees
+
+**Key Features:**
+- Order ID tracking
+- Balance management per user per token
+- Event emission for UI updates
+- Fee mechanism (configurable)
+- Order cancellation
+
+### Token.sol
+Standard ERC-20 token implementation:
+- ✅ Token transfers
+- ✅ Approval mechanism
+- ✅ Balance queries
+- ✅ Total supply tracking
+
+**Token Details:**
+- Name: "Dapp Token" (customizable)
+- Symbol: "DAPP" (customizable)
+- Decimals: 18 (standard)
+- Initial Supply: Set at deployment
+
+## 🔧 Core Functions
+
+### Exchange Contract
+
+#### Deposit & Withdrawal
+
+**depositEther()**
+```solidity
+function depositEther() public payable
+```
+Deposit ETH to the exchange for trading.
+
+**withdrawEther(uint256 _amount)**
+```solidity
+function withdrawEther(uint256 _amount) public
+```
+Withdraw ETH from the exchange to your wallet.
+
+**depositToken(address _token, uint256 _amount)**
+```solidity
+function depositToken(address _token, uint256 _amount) public
+```
+Deposit ERC-20 tokens to the exchange.
+
+**withdrawToken(address _token, uint256 _amount)**
+```solidity
+function withdrawToken(address _token, uint256 _amount) public
+```
+Withdraw tokens from the exchange to your wallet.
+
+#### Order Management
+
+**makeOrder()**
 ```solidity
 function makeOrder(
-    address _tokenGet,
-    uint256 _amountGet,
-    address _tokenGive,
-    uint256 _amountGive
+    address _tokenGet,    // Token you want to receive
+    uint256 _amountGet,   // Amount you want to receive
+    address _tokenGive,   // Token you're giving
+    uint256 _amountGive   // Amount you're giving
 ) public
 ```
 
-**Usage:**
+Creates a new limit order on the exchange.
+
+**Example: Buy Order**
 ```javascript
+// Buy 10 DAPP tokens for 1 ETH
 await exchange.methods.makeOrder(
-  tokenAddress,
-  web3.utils.toWei('10', 'ether'),
-  ETHER_ADDRESS,
-  web3.utils.toWei('1', 'ether')
+  dappTokenAddress,                  // tokenGet: DAPP
+  web3.utils.toWei('10', 'ether'),   // amountGet: 10 DAPP
+  ETHER_ADDRESS,                     // tokenGive: ETH
+  web3.utils.toWei('1', 'ether')     // amountGive: 1 ETH
 ).send({ from: account })
 ```
 
-#### fillOrder()
+**Example: Sell Order**
+```javascript
+// Sell 10 DAPP tokens for 1 ETH
+await exchange.methods.makeOrder(
+  ETHER_ADDRESS,                     // tokenGet: ETH
+  web3.utils.toWei('1', 'ether'),    // amountGet: 1 ETH
+  dappTokenAddress,                  // tokenGive: DAPP
+  web3.utils.toWei('10', 'ether')    // amountGive: 10 DAPP
+).send({ from: account })
+```
 
-Execute an existing order.
+**fillOrder(uint256 _id)**
 ```solidity
 function fillOrder(uint256 _id) public
 ```
+Execute an existing order by providing the counter assets.
 
-#### cancelOrder()
-
-Cancel your own order.
+**cancelOrder(uint256 _id)**
 ```solidity
 function cancelOrder(uint256 _id) public
 ```
+Cancel your own open order. Cannot cancel filled orders.
 
-## Token Contract
+#### Balance Queries
 
-Standard ERC-20 token implementation.
+**balanceOf(address _token, address _user)**
+```solidity
+function balanceOf(address _token, address _user) public view returns (uint256)
+```
+Check a user's balance of a specific token on the exchange.
 
-### Functions
+```javascript
+// Check ETH balance
+const ethBalance = await exchange.methods
+  .balanceOf(ETHER_ADDRESS, account)
+  .call()
 
-- `transfer()` - Transfer tokens
-- `approve()` - Approve spending
-- `balanceOf()` - Check balance
-- `allowance()` - Check allowance
+// Check token balance
+const tokenBalance = await exchange.methods
+  .balanceOf(tokenAddress, account)
+  .call()
+```
 
-## Events
+### Token Contract (ERC-20)
 
-- **Order** - New order created
-- **Trade** - Order filled
-- **Cancel** - Order cancelled
-- **Deposit** - Funds deposited
-- **Withdraw** - Funds withdrawn
+**transfer(address _to, uint256 _value)**
+```solidity
+function transfer(address _to, uint256 _value) public returns (bool success)
+```
+Transfer tokens to another address.
+
+**approve(address _spender, uint256 _value)**
+```solidity
+function approve(address _spender, uint256 _value) public returns (bool success)
+```
+Approve an address (like the exchange) to spend your tokens.
+
+**transferFrom(address _from, address _to, uint256 _value)**
+```solidity
+function transferFrom(address _from, address _to, uint256 _value) public returns (bool success)
+```
+Transfer tokens on behalf of another address (requires approval).
+
+**balanceOf(address _owner)**
+```solidity
+function balanceOf(address _owner) public view returns (uint256 balance)
+```
+Check token balance of an address.
+
+**allowance(address _owner, address _spender)**
+```solidity
+function allowance(address _owner, address _spender) public view returns (uint256 remaining)
+```
+Check how many tokens an address is allowed to spend.
+
+## 📡 Events
+
+Smart contracts emit events that the frontend listens to for real-time updates.
+
+### Exchange Events
+
+**Deposit**
+```solidity
+event Deposit(address token, address user, uint256 amount, uint256 balance)
+```
+Emitted when a user deposits ETH or tokens.
+
+**Withdraw**
+```solidity
+event Withdraw(address token, address user, uint256 amount, uint256 balance)
+```
+Emitted when a user withdraws ETH or tokens.
+
+**Order**
+```solidity
+event Order(
+    uint256 id,
+    address user,
+    address tokenGet,
+    uint256 amountGet,
+    address tokenGive,
+    uint256 amountGive,
+    uint256 timestamp
+)
+```
+Emitted when a new order is created.
+
+**Trade**
+```solidity
+event Trade(
+    uint256 id,
+    address user,
+    address tokenGet,
+    uint256 amountGet,
+    address tokenGive,
+    uint256 amountGive,
+    address userFill,
+    uint256 timestamp
+)
+```
+Emitted when an order is filled (trade executed).
+
+**Cancel**
+```solidity
+event Cancel(
+    uint256 id,
+    address user,
+    address tokenGet,
+    uint256 amountGet,
+    address tokenGive,
+    uint256 amountGive,
+    uint256 timestamp
+)
+```
+Emitted when an order is cancelled.
+
+### Token Events
+
+**Transfer**
+```solidity
+event Transfer(address indexed from, address indexed to, uint256 value)
+```
+Emitted when tokens are transferred.
+
+**Approval**
+```solidity
+event Approval(address indexed owner, address indexed spender, uint256 value)
+```
+Emitted when approval is granted.
+
+## 🔒 Security Features
+
+### Access Control
+- **Only order creator** can cancel their orders
+- **Balance checks** prevent overdrafts
+- **Approval mechanism** protects token transfers
+
+### State Validation
+- Orders can only be filled once
+- Cancelled orders cannot be filled
+- Sufficient balance required for all operations
+
+### Reentrancy Protection
+- Uses checks-effects-interactions pattern
+- State changes before external calls
+- Guards against reentrancy attacks
+
+### Integer Safety
+- Solidity 0.8.x has built-in overflow protection
+- Safe math operations by default
+
+## ⚠️ Important Considerations
+
+### Gas Costs
+Typical gas costs for operations:
+- **Deposit**: ~50,000 gas
+- **Withdraw**: ~50,000 gas
+- **Make Order**: ~100,000 gas
+- **Fill Order**: ~150,000 gas
+- **Cancel Order**: ~50,000 gas
+
+### Trading Fees
+The exchange charges a small fee on trades:
+- Default: 10% of filled amount goes to fee account
+- Configurable at deployment
+- Only charged to order taker (filler)
+
+### Order Matching
+- **Manual matching**: Users manually fill orders
+- **No automatic matching**: Unlike some DEXs
+- **Price priority**: Best prices visible in order book
+- **Time priority**: Older orders at same price filled first
+
+## 🧪 Testing
+
+### Unit Tests
+Test individual functions:
+```javascript
+// Test deposit
+await exchange.depositEther({ value: amount, from: user })
+const balance = await exchange.balanceOf(ETHER_ADDRESS, user)
+assert.equal(balance, amount)
+```
+
+### Integration Tests
+Test complete workflows:
+```javascript
+// Complete trading workflow
+1. Deploy contracts
+2. Approve tokens
+3. Deposit funds
+4. Create order
+5. Fill order
+6. Verify balances
+7. Withdraw funds
+```
+
+### Test Coverage
+- Deployment and initialization
+- Deposits and withdrawals
+- Order creation, filling, and cancellation
+- Balance tracking
+- Event emission
+- Error conditions and reverts
+
+## 📊 Gas Optimization Tips
+
+### For Users
+1. **Batch operations** when possible
+2. **Use higher gas price** for faster execution
+3. **Avoid failed transactions** by checking balances first
+4. **Cancel orders** you won't fill to get gas refund
+
+### For Developers
+1. **Pack storage variables** efficiently
+2. **Use events instead of storage** for historical data
+3. **Minimize storage writes**
+4. **Use view functions** for reads
+5. **Optimize loops** and iterations
+
+## 🔗 Contract Addresses
+
+### Sepolia Testnet
+```
+Token: 0x... (check deployment logs)
+Exchange: 0x... (check deployment logs)
+```
+
+### Mainnet
+```
+⚠️ Not deployed to mainnet yet
+⚠️ Requires professional audit first
+```
+
+## 📚 Further Reading
+
+### Deep Dive Documentation
+- [Exchange Contract Details](/smart-contracts/exchange)
+- [Token Contract Details](/smart-contracts/token)
+- [Security Best Practices](/smart-contracts/security)
+- [Gas Optimization Guide](/smart-contracts/gas-optimization)
+
+### External Resources
+- [Solidity Documentation](https://docs.soliditylang.org)
+- [ERC-20 Standard](https://eips.ethereum.org/EIPS/eip-20)
+- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts)
+- [Ethereum Smart Contract Best Practices](https://consensys.github.io/smart-contract-best-practices/)
+
+## 🛠️ Development Tools
+
+### Recommended Tools
+- **Truffle/Hardhat**: Development framework
+- **Ganache**: Local blockchain
+- **Remix**: Online Solidity IDE
+- **Mythril**: Security analysis
+- **Slither**: Static analysis
+
+### Verification
+After deployment, verify contracts on Etherscan:
+```bash
+truffle run verify Exchange --network sepolia
+truffle run verify Token --network sepolia
+```
+
+## 💡 Common Patterns
+
+### Safe Token Approval
+```javascript
+// 1. Check current allowance
+const currentAllowance = await token.methods
+  .allowance(account, exchangeAddress)
+  .call()
+
+// 2. If needed, approve
+if (currentAllowance < amount) {
+  await token.methods
+    .approve(exchangeAddress, amount)
+    .send({ from: account })
+}
+
+// 3. Now deposit
+await exchange.methods
+  .depositToken(tokenAddress, amount)
+  .send({ from: account })
+```
+
+### Check Before Trading
+```javascript
+// Always check balance before creating order
+const balance = await exchange.methods
+  .balanceOf(tokenAddress, account)
+  .call()
+
+if (balance >= requiredAmount) {
+  // Safe to create order
+  await exchange.methods.makeOrder(...)
+} else {
+  console.log('Insufficient balance. Please deposit first.')
+}
+```
+
+---
+
+**Next Steps:**
+- [Exchange Contract Deep Dive](/smart-contracts/exchange)
+- [Token Contract Deep Dive](/smart-contracts/token)
+- [Deploy Your Own Contracts](/guides/deploy-contracts)
+
+**Need help?** Check the [API Reference](/api-reference) for complete function signatures.

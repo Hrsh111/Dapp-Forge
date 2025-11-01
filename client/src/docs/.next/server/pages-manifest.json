@@ -2,5 +2,11 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js"
+  "/guides": "pages/guides.js",
+  "/deployment": "pages/deployment.js",
+  "/": "pages/index.js",
+  "/smart-contracts": "pages/smart-contracts.js",
+  "/smart-contracts/exchange": "pages/smart-contracts/exchange.js",
+  "/smart-contracts/token": "pages/smart-contracts/token.js",
+  "/smart-contracts/security": "pages/smart-contracts/security.js"
 }

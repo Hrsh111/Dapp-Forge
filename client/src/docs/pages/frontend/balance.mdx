@@ -1,0 +1,783 @@
+# Balance Component
+
+Displays user balances in both wallet and exchange, with deposit and withdrawal functionality.
+
+## 📋 Overview
+
+**File:** `src/components/Balance.js`
+
+**Purpose:**
+- Display ETH and token balances
+- Show wallet balances (in MetaMask)
+- Show exchange balances (deposited funds)
+- Provide deposit functionality
+- Provide withdrawal functionality
+
+## 🎨 Visual Structure
+
+```
+┌─────────────────────────┐
+│       Balances          │
+├─────────────────────────┤
+│ Token    Wallet Exchange│
+├─────────────────────────┤
+│ ETH      1.5    0.5     │
+│ [Deposit] [Withdraw]    │
+├─────────────────────────┤
+│ DAPP     100    50      │
+│ [Deposit] [Withdraw]    │
+└─────────────────────────┘
+```
+
+## 🏗️ Component Structure
+
+```javascript
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import { Tabs, Tab } from 'react-bootstrap'
+import Spinner from './Spinner'
+import {
+  loadBalances,
+  depositEther,
+  depositToken,
+  withdrawEther,
+  withdrawToken
+} from '../store/interactions'
+import {
+  web3Selector,
+  accountSelector,
+  tokenSelector,
+  exchangeSelector,
+  etherBalanceSelector,
+  tokenBalanceSelector,
+  exchangeEtherBalanceSelector,
+  exchangeTokenBalanceSelector,
+  balancesLoadingSelector
+} from '../store/selectors'
+
+class Balance extends Component {
+  state = {
+    etherDepositAmount: 0,
+    tokenDepositAmount: 0,
+    etherWithdrawAmount: 0,
+    tokenWithdrawAmount: 0
+  }
+
+  render() {
+    return (
+      <div className="card bg-dark text-white">
+        <div className="card-header">Balance</div>
+        <div className="card-body">
+          {this.props.showForm ? (
+            this.renderForm()
+          ) : (
+            <Spinner />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  renderForm() {
+    const {
+      etherBalance,
+      tokenBalance,
+      exchangeEtherBalance,
+      exchangeTokenBalance
+    } = this.props
+
+    return (
+      <Tabs defaultActiveKey="deposit" className="bg-dark text-white">
+        <Tab eventKey="deposit" title="Deposit" className="bg-dark">
+          {this.renderDepositForm()}
+        </Tab>
+        <Tab eventKey="withdraw" title="Withdraw" className="bg-dark">
+          {this.renderWithdrawForm()}
+        </Tab>
+      </Tabs>
+    )
+  }
+}
+
+function mapStateToProps(state) {
+  const balancesLoading = balancesLoadingSelector(state)
+
+  return {
+    web3: web3Selector(state),
+    account: accountSelector(state),
+    token: tokenSelector(state),
+    exchange: exchangeSelector(state),
+    etherBalance: etherBalanceSelector(state),
+    tokenBalance: tokenBalanceSelector(state),
+    exchangeEtherBalance: exchangeEtherBalanceSelector(state),
+    exchangeTokenBalance: exchangeTokenBalanceSelector(state),
+    balancesLoading,
+    showForm: !balancesLoading
+  }
+}
+
+export default connect(mapStateToProps)(Balance)
+```
+
+## 🎯 Key Features
+
+### 1. Balance Display
+
+**Wallet Balances:**
+```javascript
+<table className="table table-dark table-sm small">
+  <thead>
+    <tr>
+      <th>Token</th>
+      <th>Wallet</th>
+      <th>Exchange</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ETH</td>
+      <td>{this.formatBalance(this.props.etherBalance)}</td>
+      <td>{this.formatBalance(this.props.exchangeEtherBalance)}</td>
+    </tr>
+    <tr>
+      <td>DAPP</td>
+      <td>{this.formatBalance(this.props.tokenBalance)}</td>
+      <td>{this.formatBalance(this.props.exchangeTokenBalance)}</td>
+    </tr>
+  </tbody>
+</table>
+
+formatBalance(balance) {
+  if (!balance) return '0.0000'
+  return Number(balance).toFixed(4)
+}
+```
+
+### 2. Deposit Form
+
+**ETH Deposit:**
+```javascript
+renderDepositForm() {
+  return (
+    <form onSubmit={this.handleDepositEther}>
+      <div className="mb-3">
+        <label className="form-label">ETH Amount</label>
+        <div className="input-group">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="ETH Amount"
+            onChange={(e) => this.setState({ 
+              etherDepositAmount: e.target.value 
+            })}
+            required
+          />
+        </div>
+        <small className="form-text text-muted">
+          Wallet: {this.formatBalance(this.props.etherBalance)} ETH
+        </small>
+      </div>
+      <button type="submit" className="btn btn-primary btn-block">
+        Deposit ETH
+      </button>
+    </form>
+  )
+}
+
+handleDepositEther = (event) => {
+  event.preventDefault()
+  const { dispatch, web3, exchange, account } = this.props
+  const etherAmount = web3.utils.toWei(
+    this.state.etherDepositAmount, 
+    'ether'
+  )
+  
+  depositEther(dispatch, exchange, web3, etherAmount, account)
+}
+```
+
+**Token Deposit:**
+```javascript
+handleDepositToken = (event) => {
+  event.preventDefault()
+  const { dispatch, web3, exchange, token, account } = this.props
+  const tokenAmount = web3.utils.toWei(
+    this.state.tokenDepositAmount,
+    'ether'
+  )
+  
+  depositToken(dispatch, exchange, web3, token, tokenAmount, account)
+}
+```
+
+### 3. Withdraw Form
+
+**ETH Withdrawal:**
+```javascript
+renderWithdrawForm() {
+  return (
+    <form onSubmit={this.handleWithdrawEther}>
+      <div className="mb-3">
+        <label className="form-label">ETH Amount</label>
+        <div className="input-group">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="ETH Amount"
+            onChange={(e) => this.setState({ 
+              etherWithdrawAmount: e.target.value 
+            })}
+            required
+          />
+        </div>
+        <small className="form-text text-muted">
+          Exchange: {this.formatBalance(this.props.exchangeEtherBalance)} ETH
+        </small>
+      </div>
+      <button type="submit" className="btn btn-primary btn-block">
+        Withdraw ETH
+      </button>
+    </form>
+  )
+}
+
+handleWithdrawEther = (event) => {
+  event.preventDefault()
+  const { dispatch, web3, exchange, account } = this.props
+  const etherAmount = web3.utils.toWei(
+    this.state.etherWithdrawAmount,
+    'ether'
+  )
+  
+  withdrawEther(dispatch, exchange, web3, etherAmount, account)
+}
+```
+
+**Token Withdrawal:**
+```javascript
+handleWithdrawToken = (event) => {
+  event.preventDefault()
+  const { dispatch, web3, exchange, token, account } = this.props
+  const tokenAmount = web3.utils.toWei(
+    this.state.tokenWithdrawAmount,
+    'ether'
+  )
+  
+  withdrawToken(dispatch, exchange, web3, token, tokenAmount, account)
+}
+```
+
+## 🔄 Data Flow
+
+### Loading Balances
+
+```javascript
+async componentWillMount() {
+  await this.loadBalances()
+}
+
+async loadBalances() {
+  const {
+    dispatch,
+    web3,
+    exchange,
+    token,
+    account
+  } = this.props
+
+  await loadBalances(dispatch, web3, exchange, token, account)
+}
+```
+
+### Balance Update Flow
+
+```
+1. User clicks Deposit/Withdraw
+       ↓
+2. Form submission handler called
+       ↓
+3. Convert amount to Wei
+       ↓
+4. Call interaction function
+       ↓
+5. Send transaction to blockchain
+       ↓
+6. Smart contract emits event
+       ↓
+7. Event listener catches update
+       ↓
+8. Redux state updated
+       ↓
+9. Component re-renders with new balances
+```
+
+## 🎨 Styling
+
+### Tabs Component
+
+```javascript
+<Tabs defaultActiveKey="deposit" className="bg-dark text-white">
+  <Tab eventKey="deposit" title="Deposit" className="bg-dark">
+    {/* Deposit form */}
+  </Tab>
+  <Tab eventKey="withdraw" title="Withdraw" className="bg-dark">
+    {/* Withdraw form */}
+  </Tab>
+</Tabs>
+```
+
+### Form Styling
+
+```javascript
+<form className="mb-3">
+  <div className="mb-3">
+    <label className="form-label small">ETH Amount</label>
+    <input 
+      type="text"
+      className="form-control form-control-sm bg-dark text-white"
+      placeholder="0.0"
+    />
+    <small className="form-text text-muted">
+      Available: {balance} ETH
+    </small>
+  </div>
+  <button className="btn btn-primary btn-sm btn-block">
+    Submit
+  </button>
+</form>
+```
+
+### Custom CSS
+
+```css
+.balance-table {
+  font-size: 0.875rem;
+}
+
+.balance-amount {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.tab-content {
+  padding: 1rem;
+}
+```
+
+## 🔗 Redux Integration
+
+### Selectors
+
+```javascript
+// Balance selectors in store/selectors.js
+
+export const etherBalanceSelector = createSelector(
+  state => state.web3.balance,
+  balance => balance
+)
+
+export const tokenBalanceSelector = createSelector(
+  state => state.token.balance,
+  balance => balance
+)
+
+export const exchangeEtherBalanceSelector = createSelector(
+  state => state.exchange.etherBalance,
+  balance => balance
+)
+
+export const exchangeTokenBalanceSelector = createSelector(
+  state => state.exchange.tokenBalance,
+  balance => balance
+)
+
+export const balancesLoadingSelector = createSelector(
+  state => state.exchange.balancesLoading,
+  loading => loading
+)
+```
+
+### Interaction Functions
+
+**depositEther:**
+```javascript
+// store/interactions.js
+export const depositEther = async (
+  dispatch,
+  exchange,
+  web3,
+  amount,
+  account
+) => {
+  try {
+    dispatch(balancesLoading())
+    
+    await exchange.methods.depositEther()
+      .send({ from: account, value: amount })
+      .on('transactionHash', (hash) => {
+        dispatch(etherDepositMade())
+      })
+      .on('error', (error) => {
+        console.error(error)
+        window.alert('There was an error!')
+      })
+  } catch (error) {
+    console.error(error)
+  }
+}
+```
+
+**depositToken:**
+```javascript
+export const depositToken = async (
+  dispatch,
+  exchange,
+  web3,
+  token,
+  amount,
+  account
+) => {
+  try {
+    dispatch(balancesLoading())
+    
+    // Step 1: Approve tokens
+    await token.methods.approve(exchange.options.address, amount)
+      .send({ from: account })
+      .on('transactionHash', (hash) => {
+        // Approval pending
+      })
+    
+    // Step 2: Deposit tokens
+    await exchange.methods.depositToken(token.options.address, amount)
+      .send({ from: account })
+      .on('transactionHash', (hash) => {
+        dispatch(tokenDepositMade())
+      })
+      .on('error', (error) => {
+        console.error(error)
+        window.alert('There was an error!')
+      })
+  } catch (error) {
+    console.error(error)
+  }
+}
+```
+
+## 📊 Balance Calculations
+
+### Real-time Balance Updates
+
+```javascript
+componentDidUpdate(prevProps) {
+  // Update when account changes
+  if (prevProps.account !== this.props.account) {
+    this.loadBalances()
+  }
+  
+  // Update when transactions complete
+  if (
+    prevProps.exchangeEtherBalance !== this.props.exchangeEtherBalance ||
+    prevProps.exchangeTokenBalance !== this.props.exchangeTokenBalance
+  ) {
+    console.log('Balances updated')
+  }
+}
+```
+
+### Balance Validation
+
+```javascript
+validateDeposit(amount, availableBalance) {
+  const amountWei = this.props.web3.utils.toWei(amount, 'ether')
+  
+  if (parseFloat(amount) <= 0) {
+    window.alert('Amount must be greater than 0')
+    return false
+  }
+  
+  if (parseFloat(amountWei) > parseFloat(availableBalance)) {
+    window.alert('Insufficient balance')
+    return false
+  }
+  
+  return true
+}
+
+handleDepositEther = (event) => {
+  event.preventDefault()
+  
+  if (!this.validateDeposit(
+    this.state.etherDepositAmount,
+    this.props.etherBalance
+  )) {
+    return
+  }
+  
+  // Proceed with deposit
+}
+```
+
+## 🎯 Advanced Features
+
+### 1. Max Button
+
+```javascript
+<div className="input-group">
+  <input
+    type="text"
+    className="form-control"
+    value={this.state.etherDepositAmount}
+    onChange={this.handleInputChange}
+  />
+  <button 
+    className="btn btn-outline-secondary"
+    type="button"
+    onClick={this.setMaxDeposit}
+  >
+    MAX
+  </button>
+</div>
+
+setMaxDeposit = () => {
+  this.setState({
+    etherDepositAmount: this.props.web3.utils.fromWei(
+      this.props.etherBalance,
+      'ether'
+    )
+  })
+}
+```
+
+### 2. Balance History
+
+```javascript
+state = {
+  balanceHistory: []
+}
+
+componentDidUpdate(prevProps) {
+  if (prevProps.etherBalance !== this.props.etherBalance) {
+    this.setState(prev => ({
+      balanceHistory: [
+        ...prev.balanceHistory,
+        {
+          timestamp: Date.now(),
+          balance: this.props.etherBalance,
+          type: 'ETH'
+        }
+      ]
+    }))
+  }
+}
+
+renderBalanceHistory() {
+  return (
+    <div className="balance-history">
+      <h6>Recent Changes</h6>
+      <ul className="list-group">
+        {this.state.balanceHistory.slice(-5).reverse().map((entry, i) => (
+          <li key={i} className="list-group-item bg-dark text-white">
+            {this.formatBalance(entry.balance)} {entry.type}
+            <small className="text-muted float-end">
+              {new Date(entry.timestamp).toLocaleTimeString()}
+            </small>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+### 3. USD Value Display
+
+```javascript
+state = {
+  ethPrice: 0,
+  tokenPrice: 0
+}
+
+async componentDidMount() {
+  await this.loadPrices()
+}
+
+async loadPrices() {
+  try {
+    // Fetch from price API (CoinGecko, etc.)
+    const ethPrice = await fetchEthPrice()
+    const tokenPrice = await fetchTokenPrice()
+    
+    this.setState({ ethPrice, tokenPrice })
+  } catch (error) {
+    console.error('Failed to load prices:', error)
+  }
+}
+
+renderBalanceWithUSD(balance, price) {
+  const usdValue = balance * price
+  return (
+    <div>
+      <div className="balance-amount">{balance}</div>
+      <small className="text-muted">
+        ≈ ${usdValue.toFixed(2)} USD
+      </small>
+    </div>
+  )
+}
+```
+
+### 4. Transaction Confirmation
+
+```javascript
+handleDeposit = async (event) => {
+  event.preventDefault()
+  
+  // Show confirmation modal
+  const confirmed = await this.showConfirmationModal({
+    title: 'Confirm Deposit',
+    message: `Deposit ${this.state.etherDepositAmount} ETH?`,
+    amount: this.state.etherDepositAmount,
+    token: 'ETH'
+  })
+  
+  if (!confirmed) return
+  
+  // Proceed with deposit
+  this.submitDeposit()
+}
+
+showConfirmationModal(options) {
+  return new Promise((resolve) => {
+    // Show Bootstrap modal
+    // Resolve with true/false based on user choice
+  })
+}
+```
+
+## 🐛 Common Issues
+
+### Issue 1: Balance Not Updating
+
+**Problem:** Balances don't update after transaction
+
+**Solution:** Subscribe to events
+```javascript
+// In App component
+exchange.events.Deposit({}, (error, event) => {
+  if (!error) {
+    loadBalances(dispatch, web3, exchange, token, account)
+  }
+})
+```
+
+### Issue 2: Token Approval Fails
+
+**Problem:** Token deposit fails at approval step
+
+**Solution:** Check allowance first
+```javascript
+// Check current allowance
+const currentAllowance = await token.methods
+  .allowance(account, exchange.options.address)
+  .call()
+
+// If allowance sufficient, skip approval
+if (parseInt(currentAllowance) >= parseInt(amount)) {
+  // Proceed directly to deposit
+} else {
+  // Request approval first
+}
+```
+
+### Issue 3: Insufficient Gas
+
+**Problem:** Transactions fail due to gas
+
+**Solution:** Estimate gas before sending
+```javascript
+try {
+  const gasEstimate = await exchange.methods.depositEther()
+    .estimateGas({ from: account, value: amount })
+  
+  await exchange.methods.depositEther()
+    .send({ 
+      from: account, 
+      value: amount,
+      gas: Math.floor(gasEstimate * 1.2) // 20% buffer
+    })
+} catch (error) {
+  console.error('Gas estimation failed:', error)
+}
+```
+
+## 🧪 Testing
+
+```javascript
+import { render, screen, fireEvent } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import Balance from './Balance'
+import configureStore from '../store/configureStore'
+
+describe('Balance Component', () => {
+  let store
+
+  beforeEach(() => {
+    store = configureStore({
+      web3: {
+        balance: '1000000000000000000', // 1 ETH
+        account: '0x123...'
+      },
+      exchange: {
+        etherBalance: '500000000000000000', // 0.5 ETH
+        tokenBalance: '100000000000000000000' // 100 tokens
+      }
+    })
+  })
+
+  it('displays wallet balance', () => {
+    render(
+      <Provider store={store}>
+        <Balance />
+      </Provider>
+    )
+    expect(screen.getByText(/1.0000/)).toBeInTheDocument()
+  })
+
+  it('handles deposit form submission', () => {
+    render(
+      <Provider store={store}>
+        <Balance />
+      </Provider>
+    )
+    
+    const input = screen.getByPlaceholderText(/ETH Amount/)
+    const button = screen.getByText(/Deposit ETH/)
+    
+    fireEvent.change(input, { target: { value: '0.5' } })
+    fireEvent.click(button)
+    
+    // Assert transaction initiated
+  })
+})
+```
+
+## 🔗 Related Components
+
+- [NewOrder](/frontend/neworder) - Uses balance for validation
+- [MyTransactions](/frontend/mytransactions) - Shows transaction history
+- [Navbar](/frontend/navbar) - Could display quick balance
+
+## 📚 Related Documentation
+
+- [Exchange Contract](/smart-contracts/exchange) - Deposit/withdraw functions
+- [State Management](/state-management) - Balance selectors
+- [API Reference](/api-reference) - Interaction functions
+
+---
+
+**Next:** Learn about the [OrderBook Component](/frontend/orderbook) →
