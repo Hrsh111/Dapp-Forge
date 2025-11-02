@@ -9,11 +9,6 @@ self.__BUILD_MANIFEST = {
   "lowPriorityFiles": [],
   "rootMainFiles": [],
   "pages": {
-    "/": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/index.js"
-    ],
     "/_app": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
@@ -24,35 +19,20 @@ self.__BUILD_MANIFEST = {
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/deployment": [
+    "/frontend/orderbook": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/deployment.js"
+      "static/chunks/pages/frontend/orderbook.js"
     ],
-    "/guides": [
+    "/frontend/pricechart": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/guides.js"
+      "static/chunks/pages/frontend/pricechart.js"
     ],
-    "/smart-contracts": [
+    "/frontend/tradescomponent": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/smart-contracts.js"
-    ],
-    "/smart-contracts/exchange": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/smart-contracts/exchange.js"
-    ],
-    "/smart-contracts/security": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/smart-contracts/security.js"
-    ],
-    "/smart-contracts/token": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/smart-contracts/token.js"
+      "static/chunks/pages/frontend/tradescomponent.js"
     ]
   },
   "ampFirstPages": []

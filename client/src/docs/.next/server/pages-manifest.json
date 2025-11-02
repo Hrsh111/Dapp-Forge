@@ -2,11 +2,8 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/guides": "pages/guides.js",
-  "/deployment": "pages/deployment.js",
-  "/": "pages/index.js",
-  "/smart-contracts": "pages/smart-contracts.js",
-  "/smart-contracts/exchange": "pages/smart-contracts/exchange.js",
-  "/smart-contracts/token": "pages/smart-contracts/token.js",
-  "/smart-contracts/security": "pages/smart-contracts/security.js"
+  "/api-reference": "pages/api-reference.js",
+  "/frontend/orderbook": "pages/frontend/orderbook.js",
+  "/frontend/tradescomponent": "pages/frontend/tradescomponent.js",
+  "/frontend/pricechart": "pages/frontend/pricechart.js"
 }
